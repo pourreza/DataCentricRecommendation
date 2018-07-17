@@ -1,6 +1,5 @@
 package serviceWorkflowNetwork;
 
-import Evaluation.EvaluateUoWRecommendation;
 import Evaluation.WorkflowWrapper;
 import org.jgrapht.DirectedGraph;
 import org.jgrapht.Graph;
@@ -57,15 +56,6 @@ public class AnalyzeDataOptimized {
     boolean test1 = false;
     boolean test2 = false;
 
-    public static void main(String[] arg) throws ParserConfigurationException {
-
-//        extractDataFromWorkflows();
-//        findServicesInBiocatalogue();
-//        Graph<Integer, DefaultWeightedEdge> workflowWorkflowGraph = createWorkflowWorkflowGraph();
-//        Graph<String, DefaultWeightedEdge> serviceServiceGraph = createServiceServiceGraph();
-//        Graph<String, DefaultEdge> workflowServiceGraph = createWorkflowServiceGraph();
-    }
-
     public void extractDataFromWorkflows() throws ParserConfigurationException {
         services = new HashSet<SService>();
         operations = new HashSet<OOperation>();
@@ -96,7 +86,7 @@ public class AnalyzeDataOptimized {
         for (int directoryIndex = 0; directoryIndex < directoryListing.length; directoryIndex++) {
             File child = directoryListing[directoryIndex];
             print(child.getName());
-            if (child.getName().equals("214.xml")) {
+            if (child.getName().equals("398-1.xml")) {
                 print("hi");
             }
             String worflowIndexAndVersion = child.getName().substring(0, child.getName().indexOf("."));
@@ -683,16 +673,16 @@ public class AnalyzeDataOptimized {
         return workflowWorkflowGraph;
     }
 
-    public Graph<String,DefaultEdge>[] getDirectedServiceGraph() {
-//        try {
-//            extractDataFromWorkflows();
-//        } catch (ParserConfigurationException e) {
-//            e.printStackTrace();
-//        }
-        return directedServiceServiceGraph;
+    public Graph<String,DefaultEdge> getDirectedServiceGraph(boolean complete) {
+        try {
+            extractDataFromWorkflows();
+        } catch (ParserConfigurationException e) {
+            e.printStackTrace();
+        }
+        return directedServiceServiceGraph[directedServiceServiceGraph.length-1];
     }
 
-    public Set<SService> getAllServices() {
+    public Set<SService> getAllServices(boolean withLocals) {
 //        try {
 //            extractDataFromWorkflows();
 //        } catch (ParserConfigurationException e) {
@@ -1005,6 +995,9 @@ public class AnalyzeDataOptimized {
             for (int j = 0; j < childNodes.getLength(); j++) {
                 if (isXMl) {
                     serviceTypeStr = childNodes.item(j).getNodeName();
+                    if(childNodes.item(j).getNodeName().equals("s:local")){
+                        serviceTypeStr = "s:local";
+                    }
                 } else {
                     ///// if the inside element is raven then it includes the artifact which means the type of service
                     if (childNodes.item(j).getNodeName().equals("raven")) {
@@ -1016,6 +1009,7 @@ public class AnalyzeDataOptimized {
                         }
                     }
                 }
+//                numExternalServices = digForURL(workflowVersion, numExternalServices, serviceTypeStr, childNodes, processorName);
                 if (childNodes.item(j) != null) {
                     NodeList insideNodes = childNodes.item(j).getChildNodes();
                     numExternalServices = digForURL(workflowVersion, numExternalServices, serviceTypeStr, insideNodes, processorName);
@@ -1055,6 +1049,13 @@ public class AnalyzeDataOptimized {
                         break;
                     }
             }
+            else if(URLnode.getParentNode().getNodeName().equals("s:local") || (serviceTypeStr.contains("localworker-") && URLnode.getNodeName().equals("localworkerName"))){
+                ServiceType serviceType = LOCAL;
+                if(createOperationService(serviceType, processorName, k, URLnode, workflowVersion)){
+                    numExternalServices++;
+                    break;
+                }
+            }
         }
         return numExternalServices;
     }
@@ -1077,7 +1078,7 @@ public class AnalyzeDataOptimized {
     }
 
     private boolean createOperationService(ServiceType serviceType, String processorName, int k, Node URLnode, WorkflowVersion workflowVersion) {
-        String serviceURL = URLnode.getTextContent();
+        String serviceURL = URLnode.getTextContent().trim();
         String operationName = null;
 
         if (serviceType.equals(WSDL) || serviceType.equals(BIOMOBY) || serviceType.equals(ARBITRARYGT4)) {
@@ -1085,6 +1086,9 @@ public class AnalyzeDataOptimized {
         } else if (serviceType.equals(SOAPLAB)) {
             operationName = serviceURL.substring(serviceURL.lastIndexOf(".") + 1);
             serviceURL = serviceURL.substring(0, serviceURL.lastIndexOf("."));
+        }else if(serviceType.equals(LOCAL)){
+            operationName = serviceURL;
+            serviceURL = serviceURL;
         } else if (serviceType.equals(REST)) {
             String initialURL = serviceURL;
             boolean hasSpecialMark = false;

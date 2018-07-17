@@ -9,7 +9,6 @@ import org.jgrapht.graph.AsSubgraph;
 import org.jgrapht.graph.DefaultDirectedGraph;
 import org.jgrapht.graph.DefaultEdge;
 import serviceWorkflowNetwork.*;
-import utilities.PythonInterpreter2;
 
 import java.io.IOException;
 import java.util.*;
