@@ -56,7 +56,11 @@ public class AnalyzeDataOptimized {
     boolean test1 = false;
     boolean test2 = false;
 
-    public void extractDataFromWorkflows() throws ParserConfigurationException {
+    boolean withLocals = false;
+
+    public void extractDataFromWorkflows(boolean withLocals) throws ParserConfigurationException {
+        this.withLocals = withLocals;
+
         services = new HashSet<SService>();
         operations = new HashSet<OOperation>();
         workflowVersions = new HashSet<WorkflowVersion>();
@@ -86,7 +90,7 @@ public class AnalyzeDataOptimized {
         for (int directoryIndex = 0; directoryIndex < directoryListing.length; directoryIndex++) {
             File child = directoryListing[directoryIndex];
             print(child.getName());
-            if (child.getName().equals("398-1.xml")) {
+            if (child.getName().equals("3457-1.t2flow")) {
                 print("hi");
             }
             String worflowIndexAndVersion = child.getName().substring(0, child.getName().indexOf("."));
@@ -673,16 +677,16 @@ public class AnalyzeDataOptimized {
         return workflowWorkflowGraph;
     }
 
-    public Graph<String,DefaultEdge> getDirectedServiceGraph(boolean complete) {
+    public Graph<String,DefaultEdge> getDirectedServiceGraph(boolean withLocals) {
         try {
-            extractDataFromWorkflows();
+            extractDataFromWorkflows(withLocals);
         } catch (ParserConfigurationException e) {
             e.printStackTrace();
         }
         return directedServiceServiceGraph[directedServiceServiceGraph.length-1];
     }
 
-    public Set<SService> getAllServices(boolean withLocals) {
+    public Set<SService> getAllServices() {
 //        try {
 //            extractDataFromWorkflows();
 //        } catch (ParserConfigurationException e) {
@@ -692,11 +696,11 @@ public class AnalyzeDataOptimized {
     }
 
     public Set<WorkflowVersion> getAllWorkflowVersions() {
-        try {
-            extractDataFromWorkflows();
-        } catch (ParserConfigurationException e) {
-            e.printStackTrace();
-        }
+//        try {
+//            extractDataFromWorkflows(true);
+//        } catch (ParserConfigurationException e) {
+//            e.printStackTrace();
+//        }
         return workflowVersions;
     }
 
@@ -1009,7 +1013,6 @@ public class AnalyzeDataOptimized {
                         }
                     }
                 }
-//                numExternalServices = digForURL(workflowVersion, numExternalServices, serviceTypeStr, childNodes, processorName);
                 if (childNodes.item(j) != null) {
                     NodeList insideNodes = childNodes.item(j).getChildNodes();
                     numExternalServices = digForURL(workflowVersion, numExternalServices, serviceTypeStr, insideNodes, processorName);
@@ -1049,11 +1052,13 @@ public class AnalyzeDataOptimized {
                         break;
                     }
             }
-            else if(URLnode.getParentNode().getNodeName().equals("s:local") || (serviceTypeStr.contains("localworker-") && URLnode.getNodeName().equals("localworkerName"))){
-                ServiceType serviceType = LOCAL;
-                if(createOperationService(serviceType, processorName, k, URLnode, workflowVersion)){
-                    numExternalServices++;
-                    break;
+            else if(withLocals){
+                if(URLnode.getParentNode().getNodeName().equals("s:local") || (serviceTypeStr!=null && serviceTypeStr.contains("localworker-") && URLnode.getNodeName().equals("localworkerName"))) {
+                    ServiceType serviceType = LOCAL;
+                    if (createOperationService(serviceType, processorName, k, URLnode, workflowVersion)) {
+                        numExternalServices++;
+                        break;
+                    }
                 }
             }
         }
@@ -1086,9 +1091,8 @@ public class AnalyzeDataOptimized {
         } else if (serviceType.equals(SOAPLAB)) {
             operationName = serviceURL.substring(serviceURL.lastIndexOf(".") + 1);
             serviceURL = serviceURL.substring(0, serviceURL.lastIndexOf("."));
-        }else if(serviceType.equals(LOCAL)){
+        }else if(serviceType.equals(LOCAL) && withLocals){
             operationName = serviceURL;
-            serviceURL = serviceURL;
         } else if (serviceType.equals(REST)) {
             String initialURL = serviceURL;
             boolean hasSpecialMark = false;

@@ -5,9 +5,12 @@ import javafx.util.Pair;
 import org.jgrapht.Graph;
 import org.jgrapht.graph.DefaultEdge;
 import serviceWorkflowNetwork.AnalyzeDataOptimized;
+import serviceWorkflowNetwork.OOperation;
 import serviceWorkflowNetwork.SService;
 import serviceWorkflowNetwork.WorkflowVersion;
 
+import java.io.*;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -82,10 +85,59 @@ public class EvaluateDataCentricRecommendation {
     private static void init() {
         AnalyzeDataOptimized extractor = new AnalyzeDataOptimized();
         inclompleteGraph = extractor.getDirectedServiceGraph(false);
+        serviceList = extractor.getAllServices();
         completeGraph = extractor.getDirectedServiceGraph(true);
-        serviceList = extractor.getAllServices(false);
-        serviceListWithLocals = extractor.getAllServices(true);
+        serviceListWithLocals = extractor.getAllServices();
         allWorkflowVersions = extractor.getAllWorkflowVersions();
+
+
+        try {
+            FileOutputStream fout = new FileOutputStream("incomplete-graph");
+            FileOutputStream fout2 = new FileOutputStream("complete-graph");
+            FileOutputStream fout3 = new FileOutputStream("service-list");
+            FileOutputStream fout4 = new FileOutputStream("service-list-with-locals");
+            FileOutputStream fout5 = new FileOutputStream("all-workflows");
+            ObjectOutputStream oos = new ObjectOutputStream(fout);
+            ObjectOutputStream oos2 = new ObjectOutputStream(fout2);
+            ObjectOutputStream oos3 = new ObjectOutputStream(fout3);
+            ObjectOutputStream oos4 = new ObjectOutputStream(fout4);
+            ObjectOutputStream oos5 = new ObjectOutputStream(fout5);
+            oos.writeObject(inclompleteGraph);
+            oos2.writeObject(completeGraph);
+            oos3.writeObject(serviceList);
+            oos4.writeObject(serviceListWithLocals);
+            oos5.writeObject(allWorkflowVersions);
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        try {
+            FileInputStream fout = new FileInputStream("test1-uowNetwork");
+            FileInputStream fout2 = new FileInputStream("test1-allServices");
+            FileInputStream fout3 = new FileInputStream("test1-allOperations");
+            FileInputStream fout4 = new FileInputStream("test1-allWorkflows");
+            FileInputStream fout5 = new FileInputStream("allSortedWorkflowWrappers");
+            FileInputStream fout6 = new FileInputStream("allServices");
+            ObjectInputStream oos = new ObjectInputStream(fout);
+            ObjectInputStream oos2 = new ObjectInputStream(fout2);
+            ObjectInputStream oos3 = new ObjectInputStream(fout3);
+            ObjectInputStream oos4 = new ObjectInputStream(fout4);
+            ObjectInputStream oos5 = new ObjectInputStream(fout5);
+            ObjectInputStream oos6 = new ObjectInputStream(fout6);
+            inclompleteGraph = (Graph<String, DefaultEdge>) oos.readObject();
+            completeGraph = (Graph<String, DefaultEdge>) oos2.readObject();
+            serviceList = (Set<SService>) oos3.readObject();
+            serviceListWithLocals = (Set<SService>) oos4.readObject();
+            allWorkflowVersions = (Set<WorkflowVersion>) oos5.readObject();
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        }
 
         initialServicesIncidentMatrix = new HashMap<Pair<String, String>, Double>();
         newServicesIncidentMatrix = new HashMap<Pair<String, String>, Double>();
