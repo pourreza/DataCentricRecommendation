@@ -51,7 +51,7 @@ public class PythonInterpreter2
         hello.invoke("run");
     }
 
-    public static double getCosine2(String first, String second){
+    public static double getCosineSimilarity(String first, String second){
 
         Pattern p = Pattern.compile("\\w+");   // the pattern to search for
         Matcher m = p.matcher(first);

@@ -1,9 +1,10 @@
 package Evaluation;
 
 import DataCentricRecommendation.DataCentricRecommendation;
-import javafx.util.Pair;
+import org.apache.commons.math3.util.Pair;
 import org.jgrapht.Graph;
 import org.jgrapht.graph.DefaultEdge;
+import org.jgrapht.graph.DefaultWeightedEdge;
 import serviceWorkflowNetwork.AnalyzeDataOptimized;
 import serviceWorkflowNetwork.OOperation;
 import serviceWorkflowNetwork.SService;
@@ -19,8 +20,8 @@ import static utilities.Printer.print;
 
 public class EvaluateDataCentricRecommendation {
 
-    public static Graph<String, DefaultEdge> inclompleteGraph; // I call this incomplete because this does not have the local workers
-    public static Graph<String, DefaultEdge> completeGraph;  // I call this complete because in this graph we have added everything as first class citizens and we have more nodes and edges
+    public static Graph<String, DefaultWeightedEdge> inclompleteGraph; // I call this incomplete because this does not have the local workers
+    public static Graph<String, DefaultWeightedEdge> completeGraph;  // I call this complete because in this graph we have added everything as first class citizens and we have more nodes and edges
 
     public static Set<SService> serviceList;
     public static Set<SService> serviceListWithLocals;
@@ -43,18 +44,11 @@ public class EvaluateDataCentricRecommendation {
         initialEdges = inclompleteGraph.edgeSet().size();
         newEdges = completeGraph.edgeSet().size();
 
-
-//        for(SService service1: serviceList){
-//            for(SService service2: serviceList){
-//                if(!service1.equals(service2)){
-//
-//                }
-//            }
-//        }
-
         //QUESTION: should I also get the values for the initial graph ?
 
-        DataCentricRecommendation recommendationAlgorithm = new DataCentricRecommendation();
+        Map<String, SService> serviceMap = createServiceMap(serviceListWithLocals);
+        DataCentricRecommendation recommendationAlgorithm = new DataCentricRecommendation(completeGraph, allWorkflowVersions, serviceMap);
+        recommendationAlgorithm.addAllReverseEdges();
 
         for (SService service1 : serviceListWithLocals) {
             for (SService service2 : serviceListWithLocals) {
@@ -80,6 +74,14 @@ public class EvaluateDataCentricRecommendation {
         print("Number of connected nodes in new graph with local workers: " + newConnectedNodes);
         print("********************************************");
 
+    }
+
+    private static Map<String, SService> createServiceMap(Set<SService> services) {
+        Map<String, SService> serviceMap = new HashMap<String, SService>();
+        for(SService service: services){
+            serviceMap.put(service.getURL(), service);
+        }
+        return serviceMap;
     }
 
     private static void init() {
@@ -126,8 +128,8 @@ public class EvaluateDataCentricRecommendation {
             ObjectInputStream oos4 = new ObjectInputStream(fout4);
             ObjectInputStream oos5 = new ObjectInputStream(fout5);
             ObjectInputStream oos6 = new ObjectInputStream(fout6);
-            inclompleteGraph = (Graph<String, DefaultEdge>) oos.readObject();
-            completeGraph = (Graph<String, DefaultEdge>) oos2.readObject();
+            inclompleteGraph = (Graph<String, DefaultWeightedEdge>) oos.readObject();
+            completeGraph = (Graph<String, DefaultWeightedEdge>) oos2.readObject();
             serviceList = (Set<SService>) oos3.readObject();
             serviceListWithLocals = (Set<SService>) oos4.readObject();
             allWorkflowVersions = (Set<WorkflowVersion>) oos5.readObject();

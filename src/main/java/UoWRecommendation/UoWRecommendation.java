@@ -10,12 +10,9 @@ import org.jgrapht.graph.DefaultDirectedGraph;
 import org.jgrapht.graph.DefaultEdge;
 import serviceWorkflowNetwork.*;
 
-import java.io.IOException;
 import java.util.*;
 
-import static utilities.PythonInterpreter2.getCosine;
-import static utilities.PythonInterpreter2.getCosine2;
-import static utilities.RestCall.getCosineValue;
+import static utilities.PythonInterpreter2.getCosineSimilarity;
 
 
 public class UoWRecommendation {
@@ -347,7 +344,7 @@ public class UoWRecommendation {
             candidateContext += " " + serviceContext1;
         }
 //        try {
-            if (getCosine2(candidateContext, goal) > CONTEXT_SIMILARITY_THRESHOLD) {
+            if (getCosineSimilarity(candidateContext, goal) > CONTEXT_SIMILARITY_THRESHOLD) {
                 return true;
             }
 //        } catch (IOException e) {
@@ -388,7 +385,7 @@ public class UoWRecommendation {
     public static boolean areSimilar(SService service, String processorName) {
 //        try {
 //            if (getCosineValue(processorName.toLowerCase(), service.getIntent().toLowerCase()) > SERVICE_SIMILARITY_THRESHOLD)
-            if (getCosine2(processorName.toLowerCase(), service.getIntent().toLowerCase()) > SERVICE_SIMILARITY_THRESHOLD)
+            if (getCosineSimilarity(processorName.toLowerCase(), service.getIntent().toLowerCase()) > SERVICE_SIMILARITY_THRESHOLD)
                 return true;
 //        } catch (IOException e) {
 //            e.printStackTrace();

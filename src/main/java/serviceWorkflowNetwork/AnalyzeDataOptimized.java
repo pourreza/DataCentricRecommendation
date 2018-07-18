@@ -677,39 +677,24 @@ public class AnalyzeDataOptimized {
         return workflowWorkflowGraph;
     }
 
-    public Graph<String,DefaultEdge> getDirectedServiceGraph(boolean withLocals) {
+    public Graph<String,DefaultWeightedEdge> getDirectedServiceGraph(boolean withLocals) {
         try {
             extractDataFromWorkflows(withLocals);
         } catch (ParserConfigurationException e) {
             e.printStackTrace();
         }
-        return directedServiceServiceGraph[directedServiceServiceGraph.length-1];
+        return createServiceServiceGraph();
     }
 
     public Set<SService> getAllServices() {
-//        try {
-//            extractDataFromWorkflows();
-//        } catch (ParserConfigurationException e) {
-//            e.printStackTrace();
-//        }
         return services;
     }
 
     public Set<WorkflowVersion> getAllWorkflowVersions() {
-//        try {
-//            extractDataFromWorkflows(true);
-//        } catch (ParserConfigurationException e) {
-//            e.printStackTrace();
-//        }
         return workflowVersions;
     }
 
     public Set<OOperation> getAllOperations() {
-//        try {
-//            extractDataFromWorkflows();
-//        } catch (ParserConfigurationException e) {
-//            e.printStackTrace();
-//        }
         return operations;
     }
     public Graph<String,DefaultEdge>[] getUoWnetwork(ArrayList<WorkflowWrapper> workflowWrappers, boolean test2) {
