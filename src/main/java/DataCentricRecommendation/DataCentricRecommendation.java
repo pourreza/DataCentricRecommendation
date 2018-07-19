@@ -1,5 +1,6 @@
 package DataCentricRecommendation;
 
+import org._3pq.jgrapht.edge.DirectedWeightedEdge;
 import org.apache.commons.math3.util.Pair;
 import org.jgrapht.Graph;
 import org.jgrapht.GraphPath;
@@ -76,9 +77,12 @@ public class DataCentricRecommendation {
 
     public void addAllReverseEdges() {
         allReverseEdges = new ArrayList<Pair<String, String>>();
-        for(DefaultWeightedEdge edge: graph.edgeSet()){
+        Set<DefaultWeightedEdge> edges = graph.edgeSet();
+        for(DefaultWeightedEdge edge: edges){
             allReverseEdges.add(new Pair<String, String>(graph.getEdgeTarget(edge), graph.getEdgeSource(edge)));
-            graph.addEdge(graph.getEdgeTarget(edge), graph.getEdgeSource(edge));
+        }
+        for(Pair<String, String> reverseEdge: allReverseEdges){
+            graph.addEdge(reverseEdge.getFirst(), reverseEdge.getSecond());
         }
     }
 }

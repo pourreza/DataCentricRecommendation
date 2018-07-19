@@ -3,22 +3,21 @@ package Evaluation;
 import DataCentricRecommendation.DataCentricRecommendation;
 import org.apache.commons.math3.util.Pair;
 import org.jgrapht.Graph;
+import org.jgrapht.graph.DefaultDirectedWeightedGraph;
 import org.jgrapht.graph.DefaultEdge;
 import org.jgrapht.graph.DefaultWeightedEdge;
-import serviceWorkflowNetwork.AnalyzeDataOptimized;
-import serviceWorkflowNetwork.OOperation;
-import serviceWorkflowNetwork.SService;
-import serviceWorkflowNetwork.WorkflowVersion;
+import org.jgrapht.graph.SimpleWeightedGraph;
+import serviceWorkflowNetwork.*;
 
 import java.io.*;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import static utilities.Printer.print;
 
 public class EvaluateDataCentricRecommendation {
+
+    public static Graph<String, DefaultEdge> incompleteSimpleGraph;
+    public static Graph<String, DefaultEdge> completeSimpleGraph;
 
     public static Graph<String, DefaultWeightedEdge> inclompleteGraph; // I call this incomplete because this does not have the local workers
     public static Graph<String, DefaultWeightedEdge> completeGraph;  // I call this complete because in this graph we have added everything as first class citizens and we have more nodes and edges
@@ -78,61 +77,79 @@ public class EvaluateDataCentricRecommendation {
 
     private static Map<String, SService> createServiceMap(Set<SService> services) {
         Map<String, SService> serviceMap = new HashMap<String, SService>();
-        for(SService service: services){
+        for (SService service : services) {
             serviceMap.put(service.getURL(), service);
         }
         return serviceMap;
     }
 
     private static void init() {
-        AnalyzeDataOptimized extractor = new AnalyzeDataOptimized();
-        inclompleteGraph = extractor.getDirectedServiceGraph(false);
-        serviceList = extractor.getAllServices();
-        completeGraph = extractor.getDirectedServiceGraph(true);
-        serviceListWithLocals = extractor.getAllServices();
-        allWorkflowVersions = extractor.getAllWorkflowVersions();
-
+//        try {
+//
+//            AnalyzeDataOptimized extractor = new AnalyzeDataOptimized();
+//            incompleteSimpleGraph = extractor.getDirectedServiceGraph(false);
+//            serviceList = extractor.getAllServices();
+//            completeSimpleGraph = extractor.getDirectedServiceGraph(true);
+//            serviceListWithLocals = extractor.getAllServices();
+//            allWorkflowVersions = extractor.getAllWorkflowVersions();
+//            for (SService service : serviceListWithLocals) {
+//                if (service.getType().equals(ServiceType.LOCAL))
+//                    print(service.getURL());
+//            }
+//
+//
+//            FileOutputStream fout = new FileOutputStream("incomplete-graph");
+//            FileOutputStream fout2 = new FileOutputStream("complete-graph");
+//            FileOutputStream fout3 = new FileOutputStream("service-list");
+//            FileOutputStream fout4 = new FileOutputStream("service-list-with-locals");
+//            FileOutputStream fout5 = new FileOutputStream("all-workflows");
+//            FileOutputStream fout6 = new FileOutputStream("incomplete-directed-simple-graph");
+//            FileOutputStream fout7 = new FileOutputStream("complete-directed-simple-graph");
+//            ObjectOutputStream oos = new ObjectOutputStream(fout);
+//            ObjectOutputStream oos2 = new ObjectOutputStream(fout2);
+//            ObjectOutputStream oos3 = new ObjectOutputStream(fout3);
+//            ObjectOutputStream oos4 = new ObjectOutputStream(fout4);
+//            ObjectOutputStream oos5 = new ObjectOutputStream(fout5);
+//            ObjectOutputStream oos6 = new ObjectOutputStream(fout6);
+//            ObjectOutputStream oos7 = new ObjectOutputStream(fout7);
+//            oos3.writeObject(serviceList);
+//            oos4.writeObject(serviceListWithLocals);
+//            oos5.writeObject(allWorkflowVersions);
+//            oos6.writeObject(incompleteSimpleGraph);
+//            oos7.writeObject(completeSimpleGraph);
+//
+//            inclompleteGraph = createServiceServiceGraph(incompleteSimpleGraph, serviceList, allWorkflowVersions);
+//            completeGraph = createServiceServiceGraph(completeSimpleGraph, serviceListWithLocals, allWorkflowVersions);
+//            oos.writeObject(inclompleteGraph);
+//            oos2.writeObject(completeGraph);
+//        } catch (FileNotFoundException e) {
+//            e.printStackTrace();
+//        } catch (IOException e) {
+//            e.printStackTrace();
+//        }
 
         try {
-            FileOutputStream fout = new FileOutputStream("incomplete-graph");
-            FileOutputStream fout2 = new FileOutputStream("complete-graph");
-            FileOutputStream fout3 = new FileOutputStream("service-list");
-            FileOutputStream fout4 = new FileOutputStream("service-list-with-locals");
-            FileOutputStream fout5 = new FileOutputStream("all-workflows");
-            ObjectOutputStream oos = new ObjectOutputStream(fout);
-            ObjectOutputStream oos2 = new ObjectOutputStream(fout2);
-            ObjectOutputStream oos3 = new ObjectOutputStream(fout3);
-            ObjectOutputStream oos4 = new ObjectOutputStream(fout4);
-            ObjectOutputStream oos5 = new ObjectOutputStream(fout5);
-            oos.writeObject(inclompleteGraph);
-            oos2.writeObject(completeGraph);
-            oos3.writeObject(serviceList);
-            oos4.writeObject(serviceListWithLocals);
-            oos5.writeObject(allWorkflowVersions);
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        try {
-            FileInputStream fout = new FileInputStream("test1-uowNetwork");
-            FileInputStream fout2 = new FileInputStream("test1-allServices");
-            FileInputStream fout3 = new FileInputStream("test1-allOperations");
-            FileInputStream fout4 = new FileInputStream("test1-allWorkflows");
-            FileInputStream fout5 = new FileInputStream("allSortedWorkflowWrappers");
-            FileInputStream fout6 = new FileInputStream("allServices");
+            FileInputStream fout = new FileInputStream("incomplete-graph");
+            FileInputStream fout2 = new FileInputStream("complete-graph");
+            FileInputStream fout3 = new FileInputStream("service-list");
+            FileInputStream fout4 = new FileInputStream("service-list-with-locals");
+            FileInputStream fout5 = new FileInputStream("all-workflows");
+            FileInputStream fout6 = new FileInputStream("incomplete-directed-simple-graph");
+            FileInputStream fout7 = new FileInputStream("complete-directed-simple-graph");
             ObjectInputStream oos = new ObjectInputStream(fout);
             ObjectInputStream oos2 = new ObjectInputStream(fout2);
             ObjectInputStream oos3 = new ObjectInputStream(fout3);
             ObjectInputStream oos4 = new ObjectInputStream(fout4);
             ObjectInputStream oos5 = new ObjectInputStream(fout5);
             ObjectInputStream oos6 = new ObjectInputStream(fout6);
+            ObjectInputStream oos7 = new ObjectInputStream(fout7);
             inclompleteGraph = (Graph<String, DefaultWeightedEdge>) oos.readObject();
             completeGraph = (Graph<String, DefaultWeightedEdge>) oos2.readObject();
             serviceList = (Set<SService>) oos3.readObject();
             serviceListWithLocals = (Set<SService>) oos4.readObject();
             allWorkflowVersions = (Set<WorkflowVersion>) oos5.readObject();
+            incompleteSimpleGraph = (Graph<String, DefaultEdge>) oos6.readObject();
+            completeSimpleGraph = (Graph<String, DefaultEdge>) oos7.readObject();
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         } catch (IOException e) {
@@ -143,5 +160,43 @@ public class EvaluateDataCentricRecommendation {
 
         initialServicesIncidentMatrix = new HashMap<Pair<String, String>, Double>();
         newServicesIncidentMatrix = new HashMap<Pair<String, String>, Double>();
+    }
+
+    private static Graph<String, DefaultWeightedEdge> createServiceServiceGraph(Graph<String, DefaultEdge> graph, Set<SService> services, Set<WorkflowVersion> workflowVersions) {
+        Map<String, SService> serviceMap = createServiceMap(services);
+        Graph<String, DefaultWeightedEdge> weightedGraph = new DefaultDirectedWeightedGraph<String, DefaultWeightedEdge>(DefaultWeightedEdge.class);
+        int edgeNumber = 0;
+        for (DefaultEdge edge : graph.edgeSet()) {
+            print("Edge number:" + edgeNumber++);
+            SService source = serviceMap.get(graph.getEdgeSource(edge));
+            SService target = serviceMap.get(graph.getEdgeTarget(edge));
+            weightedGraph.addVertex(source.getURL());
+            weightedGraph.addVertex(target.getURL());
+            if (source.equals(target)) {
+                print("We have looooooooops X_X");
+            }
+            if (edgeNumber == 25) {
+                print("HEEEEELP!!!!!");
+            }
+
+            Set<Integer> intersectedWorkflows = new HashSet<Integer>();
+            ArrayList<WorkflowVersion> workflowVersionsList = new ArrayList<WorkflowVersion>(workflowVersions);
+            for (int k = 0; k < workflowVersionsList.size(); k++) {
+                ArrayList<OOperation> externalOperations = workflowVersionsList.get(k).getExternalOperations();
+                ArrayList<SService> servicesInWorkflow = new ArrayList<SService>();
+                for (int kk = 0; kk < externalOperations.size(); kk++) {
+                    servicesInWorkflow.add(externalOperations.get(kk).getService());
+                }
+                if (servicesInWorkflow.contains(source) && servicesInWorkflow.contains(target))
+                    intersectedWorkflows.add(workflowVersionsList.get(k).getWorkflow().getIndex());
+            }
+            if (intersectedWorkflows.size() > 0) {
+                DefaultWeightedEdge e1 = weightedGraph.addEdge(source.getURL(), target.getURL());
+                if (e1 != null) {
+                    weightedGraph.setEdgeWeight(e1, intersectedWorkflows.size());
+                }
+            }
+        }
+        return weightedGraph;
     }
 }
