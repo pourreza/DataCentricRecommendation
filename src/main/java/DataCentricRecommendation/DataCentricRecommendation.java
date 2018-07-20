@@ -3,7 +3,6 @@ package DataCentricRecommendation;
 import org.apache.commons.math3.util.Pair;
 import org.jgrapht.Graph;
 import org.jgrapht.GraphPath;
-import org.jgrapht.alg.shortestpath.AllDirectedPaths;
 import org.jgrapht.alg.shortestpath.DijkstraShortestPath;
 import org.jgrapht.graph.DefaultEdge;
 import org.jgrapht.graph.DefaultWeightedEdge;
@@ -125,7 +124,7 @@ public class DataCentricRecommendation {
         return 1;
     }
 
-    public void addAllReverseEdges() {
+    public Graph<String, DefaultWeightedEdge> addAllReverseEdges() {
         allReverseEdges = new ArrayList<Pair<String, String>>();
         Set<DefaultWeightedEdge> edges = weightedGraph.edgeSet();
         for(DefaultWeightedEdge edge: edges){
@@ -134,5 +133,6 @@ public class DataCentricRecommendation {
         for(Pair<String, String> reverseEdge: allReverseEdges){
             weightedGraph.addEdge(reverseEdge.getFirst(), reverseEdge.getSecond());
         }
+        return weightedGraph;
     }
 }

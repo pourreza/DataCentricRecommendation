@@ -1,5 +1,6 @@
 package serviceWorkflowNetwork;
 
+import Evaluation.EvaluateDataCentricRecommendation;
 import Evaluation.WorkflowWrapper;
 import org.jgrapht.DirectedGraph;
 import org.jgrapht.Graph;
@@ -31,25 +32,19 @@ import static serviceWorkflowNetwork.ServiceType.*;
 
 public class AnalyzeDataOptimized {
 
+    public static final int UNIQUE_DATES_SIZE = EvaluateDataCentricRecommendation.NUMBER_OF_UNIQUE_DATES;
     public Set<SService> services = new HashSet<SService>();
     public Set<OOperation> operations = new HashSet<OOperation>();
     public Set<WorkflowVersion> workflowVersions = new HashSet<WorkflowVersion>();
     public Set<Workflow> workflows = new HashSet<Workflow>();
     public Set<Person> people = new HashSet<Person>();
 
-    public Set<SORelation> soRelations = new HashSet<SORelation>();
-    public Set<OWRelation> owRelations = new HashSet<OWRelation>();
+    public Graph<String, DefaultEdge>[] directedServiceServiceGraph = new Graph[UNIQUE_DATES_SIZE];
+    public Graph<OOperation, DefaultEdge>[] directedOperationOperationGraph = new Graph[UNIQUE_DATES_SIZE];
 
-    public Graph<String, DefaultEdge>[] directedServiceServiceGraph = new Graph[12];
-    public Graph<OOperation, DefaultEdge>[] directedOperationOperationGraph = new Graph[12];
-
-    public Set<SService>[] networkServices = new Set[12];
-    public Set<OOperation>[] networkOperations = new Set[12];
-    public Set<WorkflowVersion>[] networkWorkflowVersions = new Set[12];
-
-    public ArrayList<WorkflowWrapper> workflowWrappers;
-
-    public Graph<String, DefaultEdge> uowNetworkBeforeTime;
+    public Set<SService>[] networkServices = new Set[UNIQUE_DATES_SIZE];
+    public Set<OOperation>[] networkOperations = new Set[UNIQUE_DATES_SIZE];
+    public Set<WorkflowVersion>[] networkWorkflowVersions = new Set[UNIQUE_DATES_SIZE];
 
     public int notFoundUsers = 0;
     public int useless = 0;
@@ -57,6 +52,7 @@ public class AnalyzeDataOptimized {
     boolean test2 = false;
 
     boolean withLocals = false;
+    private ArrayList<Date> uniqueSortedDates;
 
     public void extractDataFromWorkflows(boolean withLocals) throws ParserConfigurationException {
         init(withLocals);
@@ -68,7 +64,7 @@ public class AnalyzeDataOptimized {
         XPathFactory xPathfactory = XPathFactory.newInstance();
         XPath xpath = xPathfactory.newXPath();
 
-        for (File file: workflowFiles) {
+        for (File file : workflowFiles) {
             print(file.getName());
             if (file.getName().equals("3457-1.t2flow")) {
                 print("hi");
@@ -133,17 +129,16 @@ public class AnalyzeDataOptimized {
         Date updateDate = findDate(workflowVersionURL, false);
         workflowVersion.setUpdateDate(updateDate);
         workflowVersions.add(workflowVersion);
-        if(workflows.contains(workflow)){
-            for(Workflow w: workflows){
-                if(w.equals(workflow)){
+        networkWorkflowVersions[dateIndex(workflowVersion)].add(workflowVersion);
+        if (workflows.contains(workflow)) {
+            for (Workflow w : workflows) {
+                if (w.equals(workflow)) {
                     w.addVersion(workflowVersion);
-//                            addContributors(w, workflowVersionURL);
                 }
             }
-        }else {
+        } else {
             workflows.add(workflow);
             workflow.addVersion(workflowVersion);
-//                    addContributors(workflow, workflowVersionURL);
         }
         return workflowVersion;
     }
@@ -162,207 +157,46 @@ public class AnalyzeDataOptimized {
         workflows = new HashSet<Workflow>();
         people = new HashSet<Person>();
 
-        soRelations = new HashSet<SORelation>();
-        owRelations = new HashSet<OWRelation>();
+        directedServiceServiceGraph = new Graph[UNIQUE_DATES_SIZE];
+        directedOperationOperationGraph = new Graph[UNIQUE_DATES_SIZE];
 
-        directedServiceServiceGraph = new Graph[12];
-        directedOperationOperationGraph = new Graph[12];
-
-        uowNetworkBeforeTime = new DefaultDirectedGraph<String, DefaultEdge>(DefaultEdge.class);
-
-        for(int i=0; i<12; i++){
+        for (int i = 0; i < UNIQUE_DATES_SIZE; i++) {
             directedServiceServiceGraph[i] = new DefaultDirectedGraph<String, DefaultEdge>(DefaultEdge.class);
             directedOperationOperationGraph[i] = new DefaultDirectedGraph<OOperation, DefaultEdge>(DefaultEdge.class);
+            networkServices[i] = new HashSet<SService>();
+            networkOperations[i] = new HashSet<OOperation>();
+            networkWorkflowVersions[i] = new HashSet<WorkflowVersion>();
         }
     }
 
-    private void addNetworkNodeForTestGraph(WorkflowVersion workflowVersion, OOperation operation, SService service) {
-        int index = 0;
-        for(int i=0; i<workflowWrappers.size(); i++){
-            if(test1) {
-                if(workflowWrappers.get(i).getWorkflow().equals(workflowVersion)){
-                    index = i;
-                    break;
-                }
-            }else{
-                if(!(workflowVersion.getWorkflow().getIndex().equals(workflowWrappers.get(i).getWorkflow().getWorkflow().getIndex()) && workflowVersion.getVersionIndex().compareTo(workflowWrappers.get(i).getWorkflow().getVersionIndex())>=0))
-                {
-                    directedServiceServiceGraph[i].addVertex(service.getURL());
-                    networkServices[i].add(service);
-                    networkOperations[i].add(operation);
-                }
-            }
-            index++;
-        }
-        if(test1){
-            for(int i=index+1; i<workflowWrappers.size(); i++){
-                directedServiceServiceGraph[i].addVertex(service.getURL());
-                networkServices[i].add(service);
-                networkOperations[i].add(operation);
-            }
-        }
-    }
-
-    private void addEdgetoNetworkForTest(WorkflowVersion workflowVersion, SService source, SService sink) {
-        int index = 0;
-        for(int i=0; i<workflowWrappers.size(); i++){
-            if(test1) {
-                if(workflowWrappers.get(i).getWorkflow().equals(workflowVersion)){
-                    index = i;
-                    break;
-                }
-            }else{
-                if(!(workflowVersion.getWorkflow().getIndex().equals(workflowWrappers.get(i).getWorkflow().getWorkflow().getIndex()) && workflowVersion.getVersionIndex().compareTo(workflowWrappers.get(i).getWorkflow().getVersionIndex())>=0))
-                {
-                    directedServiceServiceGraph[i].addEdge(source.getURL(), sink.getURL());
-                }
-            }
-            index++;
-        }
-        if(test1){
-            for(int i=index+1; i<workflowWrappers.size(); i++){
-                directedServiceServiceGraph[i].addEdge(source.getURL(), sink.getURL());
-            }
-        }
-    }
-
-    private void addToNetwork(WorkflowVersion workflowVersion) {
-        int index = 0;
-        for(int i=0; i<workflowWrappers.size(); i++){
-            if(test1) {
-                if(workflowWrappers.get(i).getWorkflow().equals(workflowVersion)){
-                    index = i;
-                    break;
-                }
-            }else{
-                if(!(workflowVersion.getWorkflow().getIndex().equals(workflowWrappers.get(i).getWorkflow().getWorkflow().getIndex()) && workflowVersion.getVersionIndex().compareTo(workflowWrappers.get(i).getWorkflow().getVersionIndex())>=0))
-                {
-                    if(networkWorkflowVersions[i]==null)
-                        networkWorkflowVersions[i] = new HashSet<WorkflowVersion>();
-                    networkWorkflowVersions[i].add(workflowVersion);
-                }
-            }
-            index++;
-        }
-        if(test1){
-            for(int i=index+1; i<workflowWrappers.size(); i++){
-                if(networkWorkflowVersions[i]==null)
-                    networkWorkflowVersions[i] = new HashSet<WorkflowVersion>();
-                networkWorkflowVersions[i].add(workflowVersion);
-            }
-        }
-    }
-
-    private String minMaxDate(Set<Workflow> workflows) {
-        int minyear = 2018;
-        int maxYear = 1800;
-        for(WorkflowVersion workflow: workflowVersions){
-            if(workflow.getDate().getYear()<minyear)
-                minyear = workflow.getDate().getYear();
-            if(workflow.getDate().getYear()>maxYear)
-                maxYear = workflow.getDate().getYear();
-        }
-        return "Min Year: "+ minyear + " Max Year: "+ maxYear;
-    }
-
-    private Graph<String, DefaultEdge> createWorkflowServiceGraph() {
-        Graph<String, DefaultEdge> workflowServiceGraph = new SimpleGraph<String, DefaultEdge>(DefaultEdge.class);
-        ArrayList<OWRelation> owRelationsList = new ArrayList<OWRelation>(owRelations);
-        for (int i = 0; i < owRelationsList.size(); i++) {
-            String service = owRelationsList.get(i).operation.getService().getURL();
-            workflowServiceGraph.addVertex(service);
-            String workflow = owRelationsList.get(i).workflowVersion.getWorkflow().getIndex().toString();
-            workflowServiceGraph.addVertex(workflow);
-            workflowServiceGraph.addEdge(service, workflow);
-        }
-        return workflowServiceGraph;
-    }
-
-    private Graph<Integer, DefaultWeightedEdge> createWorkflowWorkflowGraph() {
-        Graph<Integer, DefaultWeightedEdge> workflowWorkflowGraph = new SimpleWeightedGraph<Integer, DefaultWeightedEdge>(DefaultWeightedEdge.class);
-        ArrayList<WorkflowVersion> workflowVersionsList = new ArrayList<WorkflowVersion>(workflowVersions);
-        for (int i = 0; i < workflowVersionsList.size(); i++) {
-            ArrayList<OOperation> externalOperations = workflowVersionsList.get(i).getExternalOperations();
-            Integer workflowIndex1 = workflowVersionsList.get(i).getWorkflow().getIndex();
-            workflowWorkflowGraph.addVertex(workflowIndex1);
-            for (int j = i + 1; j < workflowVersionsList.size(); j++) {
-                Integer workflowIndex2 = workflowVersionsList.get(j).getWorkflow().getIndex();
-                if (!workflowIndex2.equals(workflowIndex1)) {
-                    workflowWorkflowGraph.addVertex(workflowIndex2);
-                    ArrayList<OOperation> externalOperations2 = workflowVersionsList.get(j).getExternalOperations();
-                    int intersectionSize = intersectionSize(externalOperations, externalOperations2);
-                    if (intersectionSize > 0) {
-                        DefaultWeightedEdge e1 = workflowWorkflowGraph.addEdge(workflowIndex1, workflowIndex2);
-                        if (e1 != null)
-                            workflowWorkflowGraph.setEdgeWeight(e1, intersectionSize);
-                        else {
-                            DefaultWeightedEdge e2 = workflowWorkflowGraph.getEdge(workflowIndex1, workflowIndex2);
-                            double edgeWeight = ((SimpleWeightedGraph) workflowWorkflowGraph).getEdgeWeight(e2);
-                            if (edgeWeight < intersectionSize)
-                                workflowWorkflowGraph.setEdgeWeight(e2, intersectionSize);
-                        }
-                    }
-                }
-            }
-        }
-        return workflowWorkflowGraph;
-    }
-
-    public Graph<String,DefaultEdge> getDirectedServiceGraph(boolean withLocals) {
+    public Graph<String, DefaultEdge>[] getDirectedServiceGraph(boolean withLocals, ArrayList<Date> uniqueSortedDates) {
+        this.uniqueSortedDates = new ArrayList<Date>(uniqueSortedDates);
         try {
             extractDataFromWorkflows(withLocals);
         } catch (ParserConfigurationException e) {
             e.printStackTrace();
         }
-        return directedServiceServiceGraph[0];
+        return directedServiceServiceGraph;
     }
 
-    public Set<SService> getAllServices() {
-        return services;
-    }
-
-    public Set<WorkflowVersion> getAllWorkflowVersions() {
-        return workflowVersions;
-    }
-
-    public Set<OOperation> getAllOperations() {
-        return operations;
-    }
-
-    public Set<SService>[] getAllNetworkServices() {
+    public Set<SService>[] getAllServices() {
+        print("Combine Services");
+        for(int i=0; i<UNIQUE_DATES_SIZE; i++){
+            for(int j=i+1; j<UNIQUE_DATES_SIZE; j++){
+                networkServices[j].addAll(networkServices[i]);
+            }
+        }
         return networkServices;
     }
 
-    public Set<OOperation>[] getAllNetworkOperations() {
-        return networkOperations;
-    }
-
-    public Set<WorkflowVersion>[] getAllNetworkWorkflowVersions() {
-        return networkWorkflowVersions;
-    }
-
-    class MyWeightedEdge extends DefaultWeightedEdge {
-
-
-        @Override
-        public String toString() {
-            return Double.toString(getWeight());
-        }
-
-
-    }
-    private int intersectionSize(ArrayList<OOperation> externalOperations, ArrayList<OOperation> externalOperations2) {
-        int intersectionSize = 0;
-        for (int i = 0; i < externalOperations.size(); i++) {
-            for (int j = 0; j < externalOperations2.size(); j++) {
-                if (!externalOperations.get(i).equals(externalOperations2.get(j)))
-                    if (externalOperations.get(i).getService().getURL().equals(externalOperations2.get(j).getService().getURL())) {
-                        intersectionSize++;
-                        break;
-                    }
+    public Set<WorkflowVersion>[] getAllWorkflowVersions() {
+        print("Combine Workflows");
+        for(int i=0; i<UNIQUE_DATES_SIZE; i++){
+            for(int j=i+1; j<UNIQUE_DATES_SIZE; j++){
+                networkWorkflowVersions[j].addAll(networkWorkflowVersions[i]);
             }
         }
-        return intersectionSize;
+        return networkWorkflowVersions;
     }
 
     private void createEdgesForDirectedGraphs(Graph<String, DefaultEdge> directedProcessorGraph, WorkflowVersion workflowVersion) {
@@ -373,12 +207,8 @@ public class AnalyzeDataOptimized {
                     OOperation sink = workflowVersion.getExternalOperations().get(j);
                     GraphPath<String, DefaultEdge> path = DijkstraShortestPath.findPathBetween(directedProcessorGraph, source.getProcessorName(), sink.getProcessorName());
                     if (path != null && !source.getService().equals(sink.getService())) {
-                        if(!test1 && !test2) {
-                            directedServiceServiceGraph[yearIndex(workflowVersion)].addEdge(source.getService().getURL(), sink.getService().getURL());
-                            directedOperationOperationGraph[yearIndex(workflowVersion)].addEdge(source, sink);
-                        }else{
-                            addEdgetoNetworkForTest(workflowVersion, source.getService(), sink.getService());
-                        }
+                        directedServiceServiceGraph[dateIndex(workflowVersion)].addEdge(source.getService().getURL(), sink.getService().getURL());
+                        directedOperationOperationGraph[dateIndex(workflowVersion)].addEdge(source, sink);
                     }
                 }
             }
@@ -423,171 +253,6 @@ public class AnalyzeDataOptimized {
         }
     }
 
-    private void findServicesInBiocatalogue() {
-        ArrayList<OOperation> operationList = new ArrayList<OOperation>(operations);
-        int countFoundServices = 0;
-        int operationNumber = 0;
-        for (OOperation operation : operationList) {
-            print("service: " + (++operationNumber));
-            if (findServiceName(operation.getService().getURL())) {
-                print("Found URL: " + operation.toString());
-                countFoundServices++;
-            } else if (operation.getService().getType().equals(SOAPLAB)) {
-                if (findServiceName(operation.getName())) {
-                    countFoundServices++;
-                    print("Found Name: " + operation.toString());
-                }
-            }
-        }
-        print("Found Operations in Biocatalogue: " + countFoundServices);
-    }
-
-    private boolean findServiceName(String serviceName) {
-        String url = "https://www.biocatalogue.org/search?utf8=✓&q=" + serviceName;
-        try {
-            org.jsoup.nodes.Document document = Jsoup.connect(url).userAgent("Mozilla/5.0").timeout(10 * 1000000).get();
-            Elements searchResult = document.select("div[id=search_results]");
-            if (searchResult.size() > 0)
-                return true;
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return false;
-    }
-
-    private Person findPerson(String workflowURL) {
-        String csvFile = "feedmeWithVersionsAll";
-        BufferedReader br = null;
-        String line = "";
-        try {
-
-            br = new BufferedReader(new FileReader(csvFile));
-            line = br.readLine();
-            int lineNumber = 2;
-            while ((line = br.readLine()) != null) {
-                String[] data2 = line.split("\"");
-                if (workflowURL.equals(data2[3])) {
-                    int id = Integer.parseInt(data2[33].substring(data2[33].lastIndexOf("/") + 1));
-                    String name = data2[39];
-                    return new Person(name, id);
-                }
-            }
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        print("Person NOT FOUNDDDDDDDDDDDDDDDDDDDDDD");
-        return null;
-    }
-
-    private String findDescription(String workflowURL) {
-        String csvFile = "feedmeWithVersionsAll";
-        BufferedReader br = null;
-        String line = "";
-        try {
-
-            br = new BufferedReader(new FileReader(csvFile));
-            line = br.readLine();
-            int lineNumber = 2;
-            while ((line = br.readLine()) != null) {
-                String[] data2 = line.split("\"");
-                if (workflowURL.equals(data2[3])) {
-                    if(data2.length>9) {
-                        String description = data2[63];
-                        return description;
-                    }
-                }
-            }
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        return null;
-    }
-
-    private void addContributors(Workflow workflow, String workflowVersionURL) {
-        String csvFile = "feedmeWithVersionsAll";
-        BufferedReader br = null;
-        String line = "";
-        try {
-
-            br = new BufferedReader(new FileReader(csvFile));
-            line = br.readLine();
-            int lineNumber = 2;
-            while ((line = br.readLine()) != null) {
-                String[] data2 = line.split("\"");
-                //Creation date
-                if (workflowVersionURL.equals(data2[3])) {
-                    //update date
-                    if (!data2[17].equals("")) {
-                        String[] ids = data2[57].split(",");
-                        String[] names = data2[51].split(",");
-                        for(int i=0; i<ids.length; i++){
-                            int userID = Integer.parseInt(ids[i].substring(ids[i].lastIndexOf("/") + 1));
-                            String name = names[i];
-                            Person person = new Person(name, userID);
-                            if(workflow.getContributors().contains(person) && ids.length==1)
-                                useless++;
-                            workflow.addContributor(person);
-                            people.add(person);
-                        }
-                    }else
-                        notFoundUsers++;
-                    break;
-                }
-            }
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    private Date findDate(String workflowURL, boolean isCreation) {
-        String csvFile = "feedmeWithVersionsAll";
-        BufferedReader br = null;
-        String line = "";
-        try {
-
-            br = new BufferedReader(new FileReader(csvFile));
-            line = br.readLine();
-            int lineNumber = 2;
-            while ((line = br.readLine()) != null) {
-                String[] data2 = line.split("\"");
-                //Creation date
-                if(data2.length<60){
-                    print(line);
-                }
-                if (workflowURL.equals(data2[3])) {
-                    //update date
-                    String date = data2[15];
-
-                    if (!isCreation) {
-                        date = data2[21];
-                        if (date == null || date.trim().equals(""))
-                            date = data2[15].trim();
-                    }
-
-                    int year = Integer.parseInt(date.substring(0, 4));
-                    int month = Integer.parseInt(date.substring(5, 7));
-                    int days = Integer.parseInt(date.substring(8, 10));
-                    return new Date(year, month, days);
-                }
-            }
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        print("NOT FOUUUUUUUUUUUUUUUUUUUUUUUUD DATE");
-        return null;
-    }
-
     private int retrieveExternalServices(boolean isXMl, NodeList processorNode, WorkflowVersion workflowVersion, Graph<String, DefaultEdge> directedProcessorGraph) {
         int numExternalServices = 0;
         ///////for every processor
@@ -607,7 +272,7 @@ public class AnalyzeDataOptimized {
             for (int j = 0; j < childNodes.getLength(); j++) {
                 if (isXMl) {
                     serviceTypeStr = childNodes.item(j).getNodeName();
-                    if(childNodes.item(j).getNodeName().equals("s:local")){
+                    if (childNodes.item(j).getNodeName().equals("s:local")) {
                         serviceTypeStr = "s:local";
                     }
                 } else {
@@ -652,16 +317,14 @@ public class AnalyzeDataOptimized {
         for (int k = 0; k < insideNodes.getLength(); k++) {
             Node URLnode = insideNodes.item(k);
             if (URLnode.getTextContent().startsWith("http://") || URLnode.getTextContent().startsWith("https://")) {
-//                print("&&&&&&&&&&&&&&&&&&&&&&&&"+URLnode.getNodeName());
                 ServiceType serviceType = findServiceType(serviceTypeStr);
                 if (serviceType != null)
                     if (createOperationService(serviceType, processorName, k, URLnode, workflowVersion)) {
                         numExternalServices++;
                         break;
                     }
-            }
-            else if(withLocals){
-                if(URLnode.getParentNode().getNodeName().equals("s:local") || (serviceTypeStr!=null && serviceTypeStr.contains("localworker-") && URLnode.getNodeName().equals("localworkerName"))) {
+            } else if (withLocals) {
+                if (URLnode.getParentNode().getNodeName().equals("s:local") || (serviceTypeStr != null && serviceTypeStr.contains("localworker-") && URLnode.getNodeName().equals("localworkerName"))) {
                     ServiceType serviceType = LOCAL;
                     if (createOperationService(serviceType, processorName, k, URLnode, workflowVersion)) {
                         numExternalServices++;
@@ -673,23 +336,6 @@ public class AnalyzeDataOptimized {
         return numExternalServices;
     }
 
-    private ServiceType findServiceType(String serviceTypeStr) {
-        serviceTypeStr = serviceTypeStr.toLowerCase().trim();
-        if (serviceTypeStr.contains("soaplab"))
-            return SOAPLAB;
-        if (serviceTypeStr.contains("biomoby"))
-            return BIOMOBY;
-        if (serviceTypeStr.contains("rest"))
-            return REST;
-        if (serviceTypeStr.contains("sadi"))
-            return SADI;
-        if (serviceTypeStr.contains("arbitrarygt4"))
-            return ARBITRARYGT4;
-        if (serviceTypeStr.contains("wsdl"))
-            return WSDL;
-        return null;
-    }
-
     private boolean createOperationService(ServiceType serviceType, String processorName, int k, Node URLnode, WorkflowVersion workflowVersion) {
         String serviceURL = URLnode.getTextContent().trim();
         String operationName = null;
@@ -699,7 +345,7 @@ public class AnalyzeDataOptimized {
         } else if (serviceType.equals(SOAPLAB)) {
             operationName = serviceURL.substring(serviceURL.lastIndexOf(".") + 1);
             serviceURL = serviceURL.substring(0, serviceURL.lastIndexOf("."));
-        }else if(serviceType.equals(LOCAL) && withLocals){
+        } else if (serviceType.equals(LOCAL) && withLocals) {
             operationName = serviceURL;
         } else if (serviceType.equals(REST)) {
             String initialURL = serviceURL;
@@ -739,32 +385,23 @@ public class AnalyzeDataOptimized {
         if (operationName != null && !operationName.equals("") && serviceURL != null) {
             SService service = new SService(serviceURL, serviceType);
             services.add(service);
+            networkServices[dateIndex(workflowVersion)].add(service);
             OOperation operation = new OOperation(service, operationName, processorName);
             operations.add(operation);
-            if(!test1 && !test2) {
-                directedServiceServiceGraph[yearIndex(workflowVersion)].addVertex(serviceURL);
-                directedOperationOperationGraph[yearIndex(workflowVersion)].addVertex(operation);
-            }else{
-                addNetworkNodeForTestGraph(workflowVersion, operation, service);
-            }
+            networkOperations[dateIndex(workflowVersion)].add(operation);
+
+            directedServiceServiceGraph[dateIndex(workflowVersion)].addVertex(serviceURL);
+            directedOperationOperationGraph[dateIndex(workflowVersion)].addVertex(operation);
 
             workflowVersion.addExternalOperation(operation);
-
-            SORelation soRelation = new SORelation(operation, service, workflowVersion.getUpdateDate());
-            soRelations.add(soRelation);
-            OWRelation owRelation = new OWRelation(operation, workflowVersion, workflowVersion.getUpdateDate());
-            owRelations.add(owRelation);
             return true;
         }
         return false;
     }
 
-    private static int yearIndex(WorkflowVersion workflowVersion) {
-//        return workflowVersion.getDate().getYear()-2007;
-        return 0;
+    private int dateIndex(WorkflowVersion workflowVersion) {
+        return uniqueSortedDates.indexOf(workflowVersion.getDate());
     }
-
-
 
     private void printSummary() {
         ArrayList<WorkflowVersion> workflowVersionList = new ArrayList<WorkflowVersion>(workflowVersions);
@@ -834,41 +471,158 @@ public class AnalyzeDataOptimized {
         double sumServices = 0;
         double sumOperations = 0;
         double hasMoreOperations = 0;
-        for(Workflow workflow: workflows){
-            sumVersions+=workflow.getVersions().size();
-            if(workflow.getVersions().size()>1)
+        for (Workflow workflow : workflows) {
+            sumVersions += workflow.getVersions().size();
+            if (workflow.getVersions().size() > 1)
                 hasMoreOperations++;
             //external operations for last version
             ArrayList<OOperation> externalOperations = workflow.getVersions().get(workflow.getVersions().size() - 1).getExternalOperations();
-            sumOperations+=externalOperations.size();
-            Set<SService> serviceSet= new HashSet<SService>();
-            for(OOperation operation: externalOperations){
+            sumOperations += externalOperations.size();
+            Set<SService> serviceSet = new HashSet<SService>();
+            for (OOperation operation : externalOperations) {
                 serviceSet.add(operation.getService());
             }
-            sumServices+=serviceSet.size();
+            sumServices += serviceSet.size();
         }
 
-        print(hasMoreOperations+"has more operations");
+        print(hasMoreOperations + "has more operations");
 
-        print(people.size()+" peopless ");
-        print(sumVersions/workflows.size()+" avg version per workflow ");
-        print(sumOperations/workflows.size()+" avg operation per workflow ");
-        print(sumServices/workflows.size()+" avg services per workflow ");
+        print(people.size() + " peopless ");
+        print(sumVersions / workflows.size() + " avg version per workflow ");
+        print(sumOperations / workflows.size() + " avg operation per workflow ");
+        print(sumServices / workflows.size() + " avg services per workflow ");
 
         print(minMaxDate(workflows));
         double sumWorkflows = 0;
-        for(Person person: people){
+        for (Person person : people) {
             int workflowsForperson = 0;
-            for(Workflow workflow: workflows){
-                if(workflow.getContributors().contains(person)) {
+            for (Workflow workflow : workflows) {
+                if (workflow.getContributors().contains(person)) {
                     workflowsForperson++;
                 }
             }
-            sumWorkflows+= workflowsForperson;
+            sumWorkflows += workflowsForperson;
         }
-        print(sumWorkflows/people.size()+" avg workflows per person ");
+        print(sumWorkflows / people.size() + " avg workflows per person ");
 
-        print("not useless: "+ useless);
-        print("not Found Users: "+ notFoundUsers);
+        print("not useless: " + useless);
+        print("not Found Users: " + notFoundUsers);
+    }
+
+    private String minMaxDate(Set<Workflow> workflows) {
+        int minyear = 2018;
+        int maxYear = 1800;
+        for (WorkflowVersion workflow : workflowVersions) {
+            if (workflow.getDate().getYear() < minyear)
+                minyear = workflow.getDate().getYear();
+            if (workflow.getDate().getYear() > maxYear)
+                maxYear = workflow.getDate().getYear();
+        }
+        return "Min Year: " + minyear + " Max Year: " + maxYear;
+    }
+
+    private Person findPerson(String workflowURL) {
+        String csvFile = "feedmeWithVersionsAll";
+        BufferedReader br = null;
+        String line = "";
+        try {
+
+            br = new BufferedReader(new FileReader(csvFile));
+            line = br.readLine();
+            int lineNumber = 2;
+            while ((line = br.readLine()) != null) {
+                String[] data2 = line.split("\"");
+                if (workflowURL.equals(data2[3])) {
+                    int id = Integer.parseInt(data2[33].substring(data2[33].lastIndexOf("/") + 1));
+                    String name = data2[39];
+                    return new Person(name, id);
+                }
+            }
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        print("Person NOT FOUNDDDDDDDDDDDDDDDDDDDDDD");
+        return null;
+    }
+
+    private String findDescription(String workflowURL) {
+        String csvFile = "feedmeWithVersionsAll";
+        BufferedReader br = null;
+        String line = "";
+        try {
+
+            br = new BufferedReader(new FileReader(csvFile));
+            line = br.readLine();
+            int lineNumber = 2;
+            while ((line = br.readLine()) != null) {
+                String[] data2 = line.split("\"");
+                if (workflowURL.equals(data2[3])) {
+                    if (data2.length > 9) {
+                        String description = data2[63];
+                        return description;
+                    }
+                }
+            }
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        return null;
+    }
+
+    private Date findDate(String workflowURL, boolean isCreation) {
+        String csvFile = "feedmeWithVersionsAll";
+        BufferedReader br = null;
+        String line = "";
+        try {
+
+            br = new BufferedReader(new FileReader(csvFile));
+            line = br.readLine();
+            int lineNumber = 2;
+            while ((line = br.readLine()) != null) {
+                String[] data2 = line.split("\"");
+                //Creation date
+                if (data2.length < 60) {
+                    print(line);
+                }
+                if (workflowURL.equals(data2[3])) {
+                    //update date
+                    String date = data2[15];
+
+                    if (!isCreation) {
+                        date = data2[21];
+                        if (date == null || date.trim().equals(""))
+                            date = data2[15].trim();
+                    }
+
+                    int year = Integer.parseInt(date.substring(0, 4));
+                    int month = Integer.parseInt(date.substring(5, 7));
+                    int days = Integer.parseInt(date.substring(8, 10));
+                    return new Date(year, month, days);
+                }
+            }
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        print("NOT FOUUUUUUUUUUUUUUUUUUUUUUUUD DATE");
+        return null;
+    }
+
+    public Set<OOperation>[] getAllOperations() {
+        print("Combine Operations");
+        for(int i=0; i<UNIQUE_DATES_SIZE; i++){
+            for(int j=i+1; j<UNIQUE_DATES_SIZE; j++){
+                networkOperations[j].addAll(networkOperations[i]);
+            }
+        }
+        return networkOperations;
     }
 }
