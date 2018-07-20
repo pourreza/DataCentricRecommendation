@@ -39,7 +39,18 @@ public class EvaluateDataCentricRecommendation {
             e.printStackTrace();
         }
 
-        for()
+        for(int timeIndex=0; timeIndex< NUMBER_OF_UNIQUE_DATES; timeIndex++){
+            int numberOfNewServicePairs = 0;
+            for(SService service1: servicesInDate[timeIndex+1]){
+                for(SService service2: servicesInDate[timeIndex+1]){
+                    if(!service1.equals(service2)){
+                        DijkstraShortestPath<String, DefaultEdge> dijkstraAlg = new DijkstraShortestPath<String, DefaultEdge>(incompleteSimpleGraph);
+                        GraphPath<String, DefaultEdge> path = dijkstraAlg.getPaths(service1.getURL()).getPath(service2.getURL());
+                        if (path != null) {
+                    }
+                }
+            }
+        }
         DataCentricRecommendation recommendationAlgm = new DataCentricRecommendation(completeGraph, workflowsInDate[NUMBER_OF_UNIQUE_DATES-1])
 
 
