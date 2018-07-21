@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.Set;
 
 public class Printer {
@@ -225,6 +226,43 @@ public class Printer {
             }
             writer.close();
         } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static void saveToExcel(ArrayList<Date> uniqueSortedDates, ArrayList<Integer> newEdges, ArrayList<Integer> numberOfPotentials, ArrayList<Double> recalls) {
+        print("Started writing in excel file");
+
+        Workbook workbook = new XSSFWorkbook(); // new HSSFWorkbook() for generating `.xls` file
+        Sheet sheet = workbook.createSheet("Results");
+
+        Row headerRow = sheet.createRow(0);
+        headerRow.createCell(0).setCellValue("Year");
+        headerRow.createCell(1).setCellValue("Month");
+        headerRow.createCell(2).setCellValue("Day");
+        headerRow.createCell(3).setCellValue("Time");
+        headerRow.createCell(4).setCellValue("Number of potentials for predictions");
+        headerRow.createCell(5).setCellValue("Number of new edges");
+        headerRow.createCell(6).setCellValue("Recall");
+
+        for (int index = 0; index < uniqueSortedDates.size()-1; index++) {
+            Row results = sheet.createRow(index + 1);
+            results.createCell(0).setCellValue(uniqueSortedDates.get(index).getYear());
+            results.createCell(1).setCellValue(uniqueSortedDates.get(index).getMonth());
+            results.createCell(2).setCellValue(uniqueSortedDates.get(index).getDate());
+            results.createCell(3).setCellValue(uniqueSortedDates.get(index).getTime());
+            results.createCell(4).setCellValue(numberOfPotentials.get(index));
+            results.createCell(5).setCellValue(newEdges.get(index));
+            results.createCell(6).setCellValue(recalls.get(index));
+        }
+
+        try {
+            FileOutputStream outputStream = new FileOutputStream("Recalls-v0.xlsx");
+            workbook.write(outputStream);
+            workbook.close();
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
             e.printStackTrace();
         }
     }

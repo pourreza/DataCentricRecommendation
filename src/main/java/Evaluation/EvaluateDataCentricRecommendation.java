@@ -7,6 +7,7 @@ import org.jgrapht.GraphPath;
 import org.jgrapht.alg.shortestpath.DijkstraShortestPath;
 import org.jgrapht.graph.*;
 import serviceWorkflowNetwork.*;
+import utilities.Printer;
 
 import java.io.*;
 import java.util.*;
@@ -39,20 +40,41 @@ public class EvaluateDataCentricRecommendation {
             e.printStackTrace();
         }
 
-        for(int timeIndex=0; timeIndex< NUMBER_OF_UNIQUE_DATES; timeIndex++){
+        ArrayList<Integer> newEdges = new ArrayList<Integer>();
+        ArrayList<Integer> numberOfPotentials = new ArrayList<Integer>();
+        ArrayList<Double> recalls = new ArrayList<Double>();
+        for(int timeIndex=0; timeIndex< NUMBER_OF_UNIQUE_DATES-1; timeIndex++){
             int numberOfNewServicePairs = 0;
-            for(SService service1: servicesInDate[timeIndex+1]){
-                for(SService service2: servicesInDate[timeIndex+1]){
-                    if(!service1.equals(service2)){
-                        DijkstraShortestPath<String, DefaultEdge> dijkstraAlg = new DijkstraShortestPath<String, DefaultEdge>(incompleteSimpleGraph);
-                        GraphPath<String, DefaultEdge> path = dijkstraAlg.getPaths(service1.getURL()).getPath(service2.getURL());
-                        if (path != null) {
+
+            int numberOfthoseWeCouldPredict = 0;
+            Graph<String, DefaultEdge> completeGraphWithReverseEdges = addReverseEdgesToGraph(completeSimpleGraph[timeIndex]);
+            for(SService service1: servicesInDate[timeIndex]){
+                for(SService service2: servicesInDate[timeIndex]){
+                    if(!service1.equals(service2) && !incompleteSimpleGraph[timeIndex].containsEdge(service1.getURL(), service2.getURL()) && incompleteSimpleGraph[timeIndex+1].containsEdge(service1.getURL(), service2.getURL())){
+                        numberOfNewServicePairs++;
+                        if(completeGraphWithReverseEdges.containsVertex(service1.getURL())&& completeGraphWithReverseEdges.containsVertex(service2.getURL())) {
+                            DijkstraShortestPath<String, DefaultEdge> dijkstraAlg = new DijkstraShortestPath<String, DefaultEdge>(completeGraphWithReverseEdges);
+                            GraphPath<String, DefaultEdge> path = dijkstraAlg.getPaths(service1.getURL()).getPath(service2.getURL());
+                            if (path != null) {
+                                numberOfthoseWeCouldPredict++;
+                            }
+                        }
                     }
                 }
             }
+            newEdges.add(numberOfNewServicePairs);
+            numberOfPotentials.add(numberOfthoseWeCouldPredict);
         }
-        DataCentricRecommendation recommendationAlgm = new DataCentricRecommendation(completeGraph, workflowsInDate[NUMBER_OF_UNIQUE_DATES-1])
 
+        for(int i=0; i<NUMBER_OF_UNIQUE_DATES; i++){
+            if(i>=numberOfPotentials.size() || i>=newEdges.size() || (newEdges.get(i)==null || newEdges.get(i)==0)){
+                recalls.add(-1.);
+            }else {
+                recalls.add((double) (numberOfPotentials.get(i) / newEdges.get(i)));
+            }
+        }
+
+        Printer.saveToExcel(uniqueSortedDates, newEdges, numberOfPotentials, recalls);
 
 
 //        int initialNodes = inclompleteGraph.vertexSet().size();
@@ -65,7 +87,7 @@ public class EvaluateDataCentricRecommendation {
 //        Graph<String, DefaultEdge> incompleteGraphWithReverseSimple = addReverseEdgesToGraph(incompleteSimpleGraph);
 //        int undirectedWithoutLocals = numberOfPairsWithPath(incompleteGraphWithReverseSimple);
 //
-////        Graph<String, DefaultEdge> completeGraphWithReverseEdges = addReverseEdgesToGraph(completeSimpleGraph);
+//        Graph<String, DefaultEdge> completeGraphWithReverseEdges = addReverseEdgesToGraph(completeSimpleGraph);
 //        int undirectedWithLocals = numberOfPairsWithPath(completeSimpleGraph);
 //
 //
