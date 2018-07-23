@@ -40,41 +40,8 @@ public class EvaluateDataCentricRecommendation {
             e.printStackTrace();
         }
 
-        ArrayList<Integer> newEdges = new ArrayList<Integer>();
-        ArrayList<Integer> numberOfPotentials = new ArrayList<Integer>();
-        ArrayList<Double> recalls = new ArrayList<Double>();
-        for(int timeIndex=0; timeIndex< NUMBER_OF_UNIQUE_DATES-1; timeIndex++){
-            int numberOfNewServicePairs = 0;
-
-            int numberOfthoseWeCouldPredict = 0;
-            Graph<String, DefaultEdge> completeGraphWithReverseEdges = addReverseEdgesToGraph(completeSimpleGraph[timeIndex]);
-            for(SService service1: servicesInDate[timeIndex]){
-                for(SService service2: servicesInDate[timeIndex]){
-                    if(!service1.equals(service2) && !incompleteSimpleGraph[timeIndex].containsEdge(service1.getURL(), service2.getURL()) && incompleteSimpleGraph[timeIndex+1].containsEdge(service1.getURL(), service2.getURL())){
-                        numberOfNewServicePairs++;
-                        if(completeGraphWithReverseEdges.containsVertex(service1.getURL())&& completeGraphWithReverseEdges.containsVertex(service2.getURL())) {
-                            DijkstraShortestPath<String, DefaultEdge> dijkstraAlg = new DijkstraShortestPath<String, DefaultEdge>(completeGraphWithReverseEdges);
-                            GraphPath<String, DefaultEdge> path = dijkstraAlg.getPaths(service1.getURL()).getPath(service2.getURL());
-                            if (path != null) {
-                                numberOfthoseWeCouldPredict++;
-                            }
-                        }
-                    }
-                }
-            }
-            newEdges.add(numberOfNewServicePairs);
-            numberOfPotentials.add(numberOfthoseWeCouldPredict);
-        }
-
-        for(int i=0; i<NUMBER_OF_UNIQUE_DATES; i++){
-            if(i>=numberOfPotentials.size() || i>=newEdges.size() || (newEdges.get(i)==null || newEdges.get(i)==0)){
-                recalls.add(-1.);
-            }else {
-                recalls.add((double) (numberOfPotentials.get(i) / newEdges.get(i)));
-            }
-        }
-
-        Printer.saveToExcel(uniqueSortedDates, newEdges, numberOfPotentials, recalls);
+        findRecalls();
+        calculatePrecisions();
 
 
 //        int initialNodes = inclompleteGraph.vertexSet().size();
@@ -103,6 +70,90 @@ public class EvaluateDataCentricRecommendation {
 //        print("Number of connected nodes in new graph with local workers and undirected: " + undirectedWithLocals);
 //        print("********************************************");
 
+    }
+
+    private static void calculatePrecisions() {
+        print("In Precision Evaluation");
+
+        Integer[] totalReported = new Integer[NUMBER_OF_UNIQUE_DATES];
+        Integer[] correctlyPredicted = new Integer[NUMBER_OF_UNIQUE_DATES];
+        long[] time = new long[NUMBER_OF_UNIQUE_DATES];
+        for(int timeIndex=0; timeIndex<NUMBER_OF_UNIQUE_DATES-1; timeIndex++){
+            print("Evaluating time = "+ (timeIndex+1));
+            Map<String, SService> serviceMap = createServiceMap(servicesInDate[timeIndex]);
+            long beforeTime = System.currentTimeMillis();
+            DataCentricRecommendation recommendation = new DataCentricRecommendation(completeGraph[timeIndex], workflowsInDate[timeIndex], servicesInDate[timeIndex], serviceMap);
+            ArrayList<Pair<String, String>> recommendedEdges = recommendation.recommend();
+            long endTime = System.currentTimeMillis();
+            time[timeIndex] = endTime-beforeTime;
+            if(recommendedEdges!=null) {
+                totalReported[timeIndex+1] = recommendedEdges.size();
+                int correctOnes = 0;
+                for (int recommedationIndex = 0; recommedationIndex < recommendedEdges.size(); recommedationIndex++) {
+                    correctOnes++;
+                }
+                correctlyPredicted[timeIndex] = correctOnes;
+            }
+        }
+        //It should be noted that the time index that we get the results for are actually timeIndex+1
+        Double[] precisions = new Double[NUMBER_OF_UNIQUE_DATES];
+        for(int timeIndex=1; timeIndex<NUMBER_OF_UNIQUE_DATES; timeIndex++){
+            if(totalReported[timeIndex]!=0){
+                precisions[timeIndex] = (double) correctlyPredicted[timeIndex]/totalReported[timeIndex];
+            }else{
+                precisions[timeIndex] = 0.;
+            }
+        }
+
+        Printer.saveToExcel(uniqueSortedDates, totalReported, correctlyPredicted, precisions, "Precisions-v0.xlsx");
+    }
+
+    private static void findRecalls() {
+
+        print("In Recall Evaluation");
+
+        Integer[] newEdges = new Integer[NUMBER_OF_UNIQUE_DATES];
+        Integer[] canBePredicted = new Integer[NUMBER_OF_UNIQUE_DATES];
+        for(int timeIndex=0; timeIndex< NUMBER_OF_UNIQUE_DATES-1; timeIndex++){
+            print("Evaluating time = "+ (timeIndex+1));
+            Graph<String, DefaultEdge> testGraph = incompleteSimpleGraph[timeIndex + 1];
+            int countNewEdges = 0;
+            int couldBePredicted = 0;
+            Map<String, SService> serviceMap = createServiceMap(servicesInDate[timeIndex]);
+            Graph<String, DefaultEdge> completeGraphWithReverseEdges = addReverseEdgesToGraph(completeSimpleGraph[timeIndex]);
+            for(DefaultEdge edge: testGraph.edgeSet()){
+                String source = testGraph.getEdgeSource(edge);
+                String target = testGraph.getEdgeTarget(edge);
+                if(serviceMap.containsKey(source) && serviceMap.containsKey(target) && !incompleteSimpleGraph[timeIndex].containsEdge(source, target)){
+                    countNewEdges++;
+                    if(completeGraphWithReverseEdges.containsVertex(source) && completeGraphWithReverseEdges.containsVertex(target)) {
+                        DijkstraShortestPath<String, DefaultEdge> dijkstraAlg = new DijkstraShortestPath<String, DefaultEdge>(completeGraphWithReverseEdges);
+                        GraphPath<String, DefaultEdge> path = dijkstraAlg.getPaths(source).getPath(target);
+                        if (path != null) {
+                            couldBePredicted++;
+                        }
+                    }
+                }
+            }
+            newEdges[timeIndex+1] = countNewEdges;
+            canBePredicted[timeIndex+1] = couldBePredicted;
+        }
+
+        //It should be noted that the time index that we get the results for are actually timeIndex+1
+        Double[] recalls = new Double[NUMBER_OF_UNIQUE_DATES];
+        for(int timeIndex=1; timeIndex<NUMBER_OF_UNIQUE_DATES; timeIndex++){
+            if(newEdges[timeIndex]!=0){
+                recalls[timeIndex] = (double) canBePredicted[timeIndex]/newEdges[timeIndex];
+            }else{
+                recalls[timeIndex] = 0.;
+            }
+        }
+
+        Printer.saveToExcel(uniqueSortedDates, newEdges, canBePredicted, recalls, "Recalls-v1.xlsx");
+    }
+
+    private static boolean containsSourceTargetServices(Set<SService> sServices, Graph<String, DefaultEdge> testGraph, DefaultEdge edge) {
+        return sServices.contains(testGraph.getEdgeSource(edge)) && sServices.contains(testGraph.getEdgeTarget(edge));
     }
 
     private static Graph<String, DefaultEdge> addReverseEdgesToGraph(Graph<String, DefaultEdge> graph) {
@@ -151,8 +202,8 @@ public class EvaluateDataCentricRecommendation {
 
     private static void init() throws IOException, ClassNotFoundException {
 
-        FileInputStream fin = new FileInputStream("unique-sorted-dates");
-        ObjectInputStream ios = new ObjectInputStream(fin);
+        FileInputStream fin0 = new FileInputStream("unique-sorted-dates");
+        ObjectInputStream ios = new ObjectInputStream(fin0);
         uniqueSortedDates = (ArrayList<Date>) ios.readObject();
 
 //        AnalyzeDataOptimized extractor = new AnalyzeDataOptimized();
@@ -173,67 +224,70 @@ public class EvaluateDataCentricRecommendation {
 //        }
 //
 //
-//        FileOutputStream fout = new FileOutputStream("incomplete-graph");
-//        FileOutputStream fout2 = new FileOutputStream("complete-graph");
-//        FileOutputStream fout3 = new FileOutputStream("service-list");
-//        FileOutputStream fout4 = new FileOutputStream("service-list-with-locals");
-//        FileOutputStream fout5 = new FileOutputStream("all-workflows");
-//        FileOutputStream fout6 = new FileOutputStream("incomplete-directed-simple-graph");
-//        FileOutputStream fout7 = new FileOutputStream("complete-directed-simple-graph");
-//        FileOutputStream fout8 = new FileOutputStream("operations-list");
-//        FileOutputStream fout9 = new FileOutputStream("operations-list-with-locals");
-//        ObjectOutputStream oos = new ObjectOutputStream(fout);
-//        ObjectOutputStream oos2 = new ObjectOutputStream(fout2);
-//        ObjectOutputStream oos3 = new ObjectOutputStream(fout3);
-//        ObjectOutputStream oos4 = new ObjectOutputStream(fout4);
-//        ObjectOutputStream oos5 = new ObjectOutputStream(fout5);
-//        ObjectOutputStream oos6 = new ObjectOutputStream(fout6);
-//        ObjectOutputStream oos7 = new ObjectOutputStream(fout7);
-//        ObjectOutputStream oos8 = new ObjectOutputStream(fout8);
-//        ObjectOutputStream oos9 = new ObjectOutputStream(fout9);
-//        oos3.writeObject(servicesInDate);
-//        oos4.writeObject(servicesWithLocalsInDate);
-//        oos5.writeObject(workflowsInDate);
-//        oos6.writeObject(incompleteSimpleGraph);
-//        oos7.writeObject(completeSimpleGraph);
-//        oos8.writeObject(operationsInDate);
-//        oos9.writeObject(operationsWithLocalsInDate);
 //
+
+        FileInputStream fin = new FileInputStream("incomplete-graph");
+        FileInputStream fin2 = new FileInputStream("complete-graph");
+        FileInputStream fin3 = new FileInputStream("service-list");
+        FileInputStream fin4 = new FileInputStream("service-list-with-locals");
+        FileInputStream fin5 = new FileInputStream("all-workflows");
+        FileInputStream fin6 = new FileInputStream("incomplete-directed-simple-graph");
+        FileInputStream fin7 = new FileInputStream("complete-directed-simple-graph");
+        FileInputStream fin8 = new FileInputStream("operations-list");
+        FileInputStream fin9 = new FileInputStream("operations-list-with-locals");
+        ObjectInputStream ois = new ObjectInputStream(fin);
+        ObjectInputStream ois2 = new ObjectInputStream(fin2);
+        ObjectInputStream ois3 = new ObjectInputStream(fin3);
+        ObjectInputStream ois4 = new ObjectInputStream(fin4);
+        ObjectInputStream ois5 = new ObjectInputStream(fin5);
+        ObjectInputStream ois6 = new ObjectInputStream(fin6);
+        ObjectInputStream ois7 = new ObjectInputStream(fin7);
+        ObjectInputStream ois8 = new ObjectInputStream(fin8);
+        ObjectInputStream ois9 = new ObjectInputStream(fin9);
+        inclompleteGraph = (Graph<String, DefaultWeightedEdge>[]) ois.readObject();
+        completeGraph = (Graph<String, DefaultWeightedEdge>[]) ois2.readObject();
+        servicesInDate = (Set<SService>[]) ois3.readObject();
+        servicesWithLocalsInDate = (Set<SService>[]) ois4.readObject();
+        workflowsInDate = (Set<WorkflowVersion>[]) ois5.readObject();
+        incompleteSimpleGraph = (Graph<String, DefaultEdge>[]) ois6.readObject();
+        completeSimpleGraph = (Graph<String, DefaultEdge>[]) ois7.readObject();
+        operationsInDate = (Set<OOperation>[]) ois8.readObject();
+        operationsWithLocalsInDate = (Set<OOperation>[]) ois9.readObject();
+
 //        inclompleteGraph = createServiceServiceGraph(incompleteSimpleGraph, servicesInDate, workflowsInDate);
 //        completeGraph = createServiceServiceGraph(completeSimpleGraph, servicesWithLocalsInDate, workflowsInDate);
-//        oos.writeObject(inclompleteGraph);
-//        oos2.writeObject(completeGraph);
-
-        FileInputStream fout = new FileInputStream("incomplete-graph");
-        FileInputStream fout2 = new FileInputStream("complete-graph");
-        FileInputStream fout3 = new FileInputStream("service-list");
-        FileInputStream fout4 = new FileInputStream("service-list-with-locals");
-        FileInputStream fout5 = new FileInputStream("all-workflows");
-        FileInputStream fout6 = new FileInputStream("incomplete-directed-simple-graph");
-        FileInputStream fout7 = new FileInputStream("complete-directed-simple-graph");
-        FileInputStream fout8 = new FileInputStream("operations-list");
-        FileInputStream fout9 = new FileInputStream("operations-list-with-locals");
-        ObjectInputStream oos = new ObjectInputStream(fout);
-        ObjectInputStream oos2 = new ObjectInputStream(fout2);
-        ObjectInputStream oos3 = new ObjectInputStream(fout3);
-        ObjectInputStream oos4 = new ObjectInputStream(fout4);
-        ObjectInputStream oos5 = new ObjectInputStream(fout5);
-        ObjectInputStream oos6 = new ObjectInputStream(fout6);
-        ObjectInputStream oos7 = new ObjectInputStream(fout7);
-        ObjectInputStream oos8 = new ObjectInputStream(fout8);
-        ObjectInputStream oos9 = new ObjectInputStream(fout9);
-        inclompleteGraph = (Graph<String, DefaultWeightedEdge>[]) oos.readObject();
-        completeGraph = (Graph<String, DefaultWeightedEdge>[]) oos2.readObject();
-        servicesInDate = (Set<SService>[]) oos3.readObject();
-        servicesWithLocalsInDate = (Set<SService>[]) oos4.readObject();
-        workflowsInDate = (Set<WorkflowVersion>[]) oos5.readObject();
-        incompleteSimpleGraph = (Graph<String, DefaultEdge>[]) oos6.readObject();
-        completeSimpleGraph = (Graph<String, DefaultEdge>[]) oos7.readObject();
-        operationsInDate = (Set<OOperation>[]) oos8.readObject();
-        operationsWithLocalsInDate = (Set<OOperation>[]) oos9.readObject();
-
+//
+//        accumulateGraphs();
+//
+//        FileOutputStream fout = new FileOutputStream("incomplete-graph");
+//        FileOutputStream fout2 = new FileOutputStream("complete-graph");
+////        FileOutputStream fout3 = new FileOutputStream("service-list");
+////        FileOutputStream fout4 = new FileOutputStream("service-list-with-locals");
+////        FileOutputStream fout5 = new FileOutputStream("all-workflows");
+//        FileOutputStream fout6 = new FileOutputStream("incomplete-directed-simple-graph");
+//        FileOutputStream fout7 = new FileOutputStream("complete-directed-simple-graph");
+////        FileOutputStream fout8 = new FileOutputStream("operations-list");
+////        FileOutputStream fout9 = new FileOutputStream("operations-list-with-locals");
+//        ObjectOutputStream oos = new ObjectOutputStream(fout);
+//        ObjectOutputStream oos2 = new ObjectOutputStream(fout2);
+////        ObjectOutputStream oos3 = new ObjectOutputStream(fout3);
+////        ObjectOutputStream oos4 = new ObjectOutputStream(fout4);
+////        ObjectOutputStream oos5 = new ObjectOutputStream(fout5);
+//        ObjectOutputStream oos6 = new ObjectOutputStream(fout6);
+//        ObjectOutputStream oos7 = new ObjectOutputStream(fout7);
+////        ObjectOutputStream oos8 = new ObjectOutputStream(fout8);
+////        ObjectOutputStream oos9 = new ObjectOutputStream(fout9);
+////        oos3.writeObject(servicesInDate);
+////        oos4.writeObject(servicesWithLocalsInDate);
+////        oos5.writeObject(workflowsInDate);
+////        oos8.writeObject(operationsInDate);
+//        oos9.writeObject(operationsWithLocalsInDate);
         print("services size: "+servicesInDate[715].size());
 //
+//        oos6.writeObject(incompleteSimpleGraph);
+//        oos7.writeObject(completeSimpleGraph);
+//        oos.writeObject(inclompleteGraph);
+//        oos2.writeObject(completeGraph);
 //        Set<Date> dates = new HashSet<Date>();
 //        for (WorkflowVersion workflowVersion : workflowsInDate) {
 //            dates.add(workflowVersion.getDate());
@@ -242,6 +296,35 @@ public class EvaluateDataCentricRecommendation {
 //        Collections.sort(uniqueSortedDates);
 //        print(uniqueSortedDates.size() + "size");
 //
+    }
+
+    private static void accumulateGraphs() {
+        for(int i=0; i<NUMBER_OF_UNIQUE_DATES; i++){
+            for(int j=i+1; j<NUMBER_OF_UNIQUE_DATES; j++){
+                updateGraph(incompleteSimpleGraph[i], incompleteSimpleGraph[j]);
+                updateGraph(completeSimpleGraph[i], completeSimpleGraph[j]);
+                updateWeightedGraph(inclompleteGraph[i], inclompleteGraph[j]);
+                updateWeightedGraph(completeGraph[i], completeGraph[j]);
+            }
+        }
+    }
+
+    private static void updateGraph(Graph<String, DefaultEdge> stringDefaultEdgeGraph, Graph<String, DefaultEdge> stringDefaultEdgeGraph1) {
+        for(String vertex: stringDefaultEdgeGraph.vertexSet()){
+            stringDefaultEdgeGraph1.addVertex(vertex);
+        }
+        for(DefaultEdge edge: stringDefaultEdgeGraph.edgeSet()){
+            stringDefaultEdgeGraph1.addEdge(stringDefaultEdgeGraph.getEdgeSource(edge), stringDefaultEdgeGraph.getEdgeTarget(edge));
+        }
+    }
+
+    private static void updateWeightedGraph(Graph<String, DefaultWeightedEdge> stringDefaultEdgeGraph, Graph<String, DefaultWeightedEdge> stringDefaultEdgeGraph1) {
+        for(String vertex: stringDefaultEdgeGraph.vertexSet()){
+            stringDefaultEdgeGraph1.addVertex(vertex);
+        }
+        for(DefaultWeightedEdge edge: stringDefaultEdgeGraph.edgeSet()){
+            stringDefaultEdgeGraph1.addEdge(stringDefaultEdgeGraph.getEdgeSource(edge), stringDefaultEdgeGraph.getEdgeTarget(edge));
+        }
     }
 
     private static Set<SService>[] setServiceIntents(Set<SService>[] servicesTest1, Set<OOperation>[] operationsTest1) {
@@ -301,6 +384,7 @@ public class EvaluateDataCentricRecommendation {
                     }
                 }
             }
+            weightedGraphs[i] = weightedGraph;
         }
         return weightedGraphs;
     }

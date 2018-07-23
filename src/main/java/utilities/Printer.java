@@ -230,7 +230,7 @@ public class Printer {
         }
     }
 
-    public static void saveToExcel(ArrayList<Date> uniqueSortedDates, ArrayList<Integer> newEdges, ArrayList<Integer> numberOfPotentials, ArrayList<Double> recalls) {
+    public static void saveToExcel(ArrayList<Date> uniqueSortedDates, Integer[] newEdges, Integer[] numberOfPotentials, Double[] recalls, String fileName) {
         print("Started writing in excel file");
 
         Workbook workbook = new XSSFWorkbook(); // new HSSFWorkbook() for generating `.xls` file
@@ -241,23 +241,23 @@ public class Printer {
         headerRow.createCell(1).setCellValue("Month");
         headerRow.createCell(2).setCellValue("Day");
         headerRow.createCell(3).setCellValue("Time");
-        headerRow.createCell(4).setCellValue("Number of potentials for predictions");
-        headerRow.createCell(5).setCellValue("Number of new edges");
-        headerRow.createCell(6).setCellValue("Recall");
+        headerRow.createCell(4).setCellValue("Number of correctly predicted edges");
+        headerRow.createCell(5).setCellValue("Number of predicted edges");
+        headerRow.createCell(6).setCellValue("Precision");
 
-        for (int index = 0; index < uniqueSortedDates.size()-1; index++) {
+        for (int index = 1; index < uniqueSortedDates.size()-1; index++) {
             Row results = sheet.createRow(index + 1);
             results.createCell(0).setCellValue(uniqueSortedDates.get(index).getYear());
             results.createCell(1).setCellValue(uniqueSortedDates.get(index).getMonth());
             results.createCell(2).setCellValue(uniqueSortedDates.get(index).getDate());
             results.createCell(3).setCellValue(uniqueSortedDates.get(index).getTime());
-            results.createCell(4).setCellValue(numberOfPotentials.get(index));
-            results.createCell(5).setCellValue(newEdges.get(index));
-            results.createCell(6).setCellValue(recalls.get(index));
+            results.createCell(4).setCellValue(numberOfPotentials[index]);
+            results.createCell(5).setCellValue(newEdges[index]);
+            results.createCell(6).setCellValue(recalls[index]);
         }
 
         try {
-            FileOutputStream outputStream = new FileOutputStream("Recalls-v0.xlsx");
+            FileOutputStream outputStream = new FileOutputStream(fileName);
             workbook.write(outputStream);
             workbook.close();
         } catch (FileNotFoundException e) {
