@@ -6,6 +6,7 @@ import org.jgrapht.Graph;
 import org.jgrapht.GraphPath;
 import org.jgrapht.alg.shortestpath.DijkstraShortestPath;
 import org.jgrapht.graph.*;
+import scala.tools.nsc.doc.model.Def;
 import serviceWorkflowNetwork.*;
 import utilities.Printer;
 
@@ -30,6 +31,7 @@ public class EvaluateDataCentricRecommendation {
     public static Set<WorkflowVersion>[] workflowsInDate;
 
     public static ArrayList<Date> uniqueSortedDates;
+    public static Integer[] newEdges;
 
     public static void main(String... args) {
         try {
@@ -79,20 +81,28 @@ public class EvaluateDataCentricRecommendation {
         Integer[] correctlyPredicted = new Integer[NUMBER_OF_UNIQUE_DATES];
         long[] time = new long[NUMBER_OF_UNIQUE_DATES];
         for(int timeIndex=0; timeIndex<NUMBER_OF_UNIQUE_DATES-1; timeIndex++){
-            print("Evaluating time = "+ (timeIndex+1));
-            Map<String, SService> serviceMap = createServiceMap(servicesInDate[timeIndex]);
-            long beforeTime = System.currentTimeMillis();
-            DataCentricRecommendation recommendation = new DataCentricRecommendation(completeGraph[timeIndex], workflowsInDate[timeIndex], servicesInDate[timeIndex], serviceMap);
-            ArrayList<Pair<String, String>> recommendedEdges = recommendation.recommend();
-            long endTime = System.currentTimeMillis();
-            time[timeIndex] = endTime-beforeTime;
-            if(recommendedEdges!=null) {
-                totalReported[timeIndex+1] = recommendedEdges.size();
-                int correctOnes = 0;
-                for (int recommedationIndex = 0; recommedationIndex < recommendedEdges.size(); recommedationIndex++) {
-                    correctOnes++;
+            if(newEdges[timeIndex+1]!=0) {
+                if (timeIndex == 34) {
+                    print("HI");
                 }
-                correctlyPredicted[timeIndex] = correctOnes;
+                print("Evaluating time = " + (timeIndex + 1));
+                Map<String, SService> serviceMap = createServiceMap(servicesWithLocalsInDate[timeIndex], timeIndex);
+                long beforeTime = System.currentTimeMillis();
+                Graph<String, DefaultWeightedEdge> completeGraphWithReverseEdges = addReverseEdgesToWeightedGraph(completeGraph[timeIndex]);
+                DataCentricRecommendation recommendation = new DataCentricRecommendation(completeGraphWithReverseEdges, workflowsInDate[timeIndex], servicesInDate[timeIndex], serviceMap);
+                ArrayList<Pair<String, String>> recommendedEdges = recommendation.recommend();
+                long endTime = System.currentTimeMillis();
+                time[timeIndex] = endTime - beforeTime;
+                if (recommendedEdges != null) {
+                    totalReported[timeIndex + 1] = recommendedEdges.size();
+                    int correctOnes = 0;
+                    for (int recommedationIndex = 0; recommedationIndex < recommendedEdges.size(); recommedationIndex++) {
+                        if (incompleteSimpleGraph[timeIndex + 1].containsEdge(recommendedEdges.get(recommedationIndex).getFirst(), recommendedEdges.get(recommedationIndex).getSecond())) {
+                            correctOnes++;
+                        }
+                    }
+                    correctlyPredicted[timeIndex + 1] = correctOnes;
+                }
             }
         }
         //It should be noted that the time index that we get the results for are actually timeIndex+1
@@ -105,6 +115,7 @@ public class EvaluateDataCentricRecommendation {
             }
         }
 
+        Printer.saveToExcel(uniqueSortedDates, time, "Times-v0.xlsx");
         Printer.saveToExcel(uniqueSortedDates, totalReported, correctlyPredicted, precisions, "Precisions-v0.xlsx");
     }
 
@@ -112,14 +123,14 @@ public class EvaluateDataCentricRecommendation {
 
         print("In Recall Evaluation");
 
-        Integer[] newEdges = new Integer[NUMBER_OF_UNIQUE_DATES];
+        newEdges = new Integer[NUMBER_OF_UNIQUE_DATES];
         Integer[] canBePredicted = new Integer[NUMBER_OF_UNIQUE_DATES];
         for(int timeIndex=0; timeIndex< NUMBER_OF_UNIQUE_DATES-1; timeIndex++){
             print("Evaluating time = "+ (timeIndex+1));
             Graph<String, DefaultEdge> testGraph = incompleteSimpleGraph[timeIndex + 1];
             int countNewEdges = 0;
             int couldBePredicted = 0;
-            Map<String, SService> serviceMap = createServiceMap(servicesInDate[timeIndex]);
+            Map<String, SService> serviceMap = createServiceMap(servicesInDate[timeIndex], timeIndex);
             Graph<String, DefaultEdge> completeGraphWithReverseEdges = addReverseEdgesToGraph(completeSimpleGraph[timeIndex]);
             for(DefaultEdge edge: testGraph.edgeSet()){
                 String source = testGraph.getEdgeSource(edge);
@@ -173,6 +184,34 @@ public class EvaluateDataCentricRecommendation {
         return graphWithReverseEdges;
     }
 
+    private static Graph<String, DefaultWeightedEdge> addReverseEdgesToWeightedGraph(Graph<String, DefaultWeightedEdge> graph) {
+        Graph<String, DefaultWeightedEdge> graphWithReverseEdges = new DefaultDirectedWeightedGraph<String, DefaultWeightedEdge>(DefaultWeightedEdge.class);
+        ArrayList<Pair<String, String>> allReverseEdges = new ArrayList<Pair<String, String>>();
+        Set<DefaultWeightedEdge> edges = graph.edgeSet();
+        for (DefaultWeightedEdge edge : edges) {
+            allReverseEdges.add(new Pair<String, String>(graph.getEdgeTarget(edge), graph.getEdgeSource(edge)));
+        }
+
+        for (Pair<String, String> reverseEdge : allReverseEdges) {
+            graphWithReverseEdges.addVertex(reverseEdge.getFirst());
+            graphWithReverseEdges.addVertex(reverseEdge.getSecond());
+
+            DefaultWeightedEdge weightedEdge = graph.getEdge(reverseEdge.getSecond(), reverseEdge.getFirst());
+            double edgeWeight = graph.getEdgeWeight(weightedEdge);
+
+            DefaultWeightedEdge defaultWeightedEdge = graphWithReverseEdges.addEdge(reverseEdge.getFirst(), reverseEdge.getSecond());
+            if(defaultWeightedEdge!=null) {
+                graphWithReverseEdges.setEdgeWeight(defaultWeightedEdge, edgeWeight);
+            }
+
+            DefaultWeightedEdge defaultWeightedEdge1 = graphWithReverseEdges.addEdge(reverseEdge.getSecond(), reverseEdge.getFirst());
+            if(defaultWeightedEdge1!=null) {
+                graphWithReverseEdges.setEdgeWeight(defaultWeightedEdge1, edgeWeight);
+            }
+        }
+        return graphWithReverseEdges;
+    }
+
     private static int numberOfPairsWithPath(Graph<String, DefaultEdge> graph, int dateIndex) {
         int numberOfPairsWithPaths = 0;
         int count = 0;
@@ -192,12 +231,25 @@ public class EvaluateDataCentricRecommendation {
         return numberOfPairsWithPaths;
     }
 
-    private static Map<String, SService> createServiceMap(Set<SService> services) {
+    private static Map<String, SService> createServiceMap(Set<SService> services, int timeIndex) {
         Map<String, SService> serviceMap = new HashMap<String, SService>();
         for (SService service : services) {
             serviceMap.put(service.getURL(), service);
+            if(service.getIntent()==null){
+                service.setIntent(findIntent(service, timeIndex));
+            }
         }
         return serviceMap;
+    }
+
+    private static String findIntent(SService service, int timeIndex) {
+        String intent = "";
+        for (OOperation operation : operationsWithLocalsInDate[timeIndex]) {
+            if (operation.getService().equals(service)) {
+                intent += operation.getProcessorName() + " " + operation.getName() + " ";
+            }
+        }
+        return intent;
     }
 
     private static void init() throws IOException, ClassNotFoundException {
@@ -350,7 +402,7 @@ public class EvaluateDataCentricRecommendation {
         Graph<String, DefaultWeightedEdge>[] weightedGraphs = new Graph[NUMBER_OF_UNIQUE_DATES];
 
         for (int i = 0; i < NUMBER_OF_UNIQUE_DATES; i++) {
-            Map<String, SService> serviceMap = createServiceMap(services[i]);
+            Map<String, SService> serviceMap = createServiceMap(services[i], i);
             Graph<String, DefaultWeightedEdge> weightedGraph = new DefaultDirectedWeightedGraph<String, DefaultWeightedEdge>(DefaultWeightedEdge.class);
             int edgeNumber = 0;
             for (DefaultEdge edge : graph[i].edgeSet()) {

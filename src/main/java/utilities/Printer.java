@@ -127,15 +127,7 @@ public class Printer {
             results.createCell(2).setCellValue(fscores[index]);
         }
 
-        try {
-            FileOutputStream outputStream = new FileOutputStream(fileName);
-            workbook.write(outputStream);
-            workbook.close();
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        writeToFile(fileName, workbook);
 
 //        Workbook workbook2 = new XSSFWorkbook(); // new HSSFWorkbook() for generating `.xls` file
 //        Sheet sheet2 = workbook2.createSheet("Results");
@@ -256,6 +248,33 @@ public class Printer {
             results.createCell(6).setCellValue(recalls[index]);
         }
 
+        writeToFile(fileName, workbook);
+    }
+
+    public static void saveToExcel(ArrayList<Date> uniqueSortedDates, long[] time, String fileName) {
+        Workbook workbook = new XSSFWorkbook(); // new HSSFWorkbook() for generating `.xls` file
+        Sheet sheet = workbook.createSheet("Results");
+
+        Row headerRow = sheet.createRow(0);
+        headerRow.createCell(0).setCellValue("Year");
+        headerRow.createCell(1).setCellValue("Month");
+        headerRow.createCell(2).setCellValue("Day");
+        headerRow.createCell(3).setCellValue("Time");
+        headerRow.createCell(4).setCellValue("Running Time");
+
+        for (int index = 1; index < uniqueSortedDates.size()-1; index++) {
+            Row results = sheet.createRow(index + 1);
+            results.createCell(0).setCellValue(uniqueSortedDates.get(index).getYear());
+            results.createCell(1).setCellValue(uniqueSortedDates.get(index).getMonth());
+            results.createCell(2).setCellValue(uniqueSortedDates.get(index).getDate());
+            results.createCell(3).setCellValue(uniqueSortedDates.get(index).getTime());
+            results.createCell(4).setCellValue(time[index]);
+        }
+
+        writeToFile(fileName, workbook);
+    }
+
+    private static void writeToFile(String fileName, Workbook workbook) {
         try {
             FileOutputStream outputStream = new FileOutputStream(fileName);
             workbook.write(outputStream);
