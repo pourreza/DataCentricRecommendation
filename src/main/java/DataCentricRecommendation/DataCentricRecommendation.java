@@ -112,7 +112,7 @@ public class DataCentricRecommendation {
     public ArrayList<Pair<String, String>> recommend() {
         ArrayList<Pair<String, String>> candidates = findCandidates();
         ArrayList<CandidateScore> candidateScores = new ArrayList<CandidateScore>();
-        int maxTries = 1000;
+        int maxTries = 100;
         if(candidates.size()<maxTries) {
             maxTries = candidates.size();
         }

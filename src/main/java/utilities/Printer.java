@@ -222,7 +222,7 @@ public class Printer {
         }
     }
 
-    public static void saveToExcel(ArrayList<Date> uniqueSortedDates, Integer[] newEdges, Integer[] numberOfPotentials, Double[] recalls, String fileName) {
+    public static void saveToExcel(ArrayList<Date> uniqueSortedDates, int[] newEdges, int[] numberOfPotentials, double[] recalls, String fileName) {
         print("Started writing in excel file");
 
         Workbook workbook = new XSSFWorkbook(); // new HSSFWorkbook() for generating `.xls` file

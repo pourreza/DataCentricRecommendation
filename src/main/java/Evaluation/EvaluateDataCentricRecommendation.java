@@ -31,7 +31,7 @@ public class EvaluateDataCentricRecommendation {
     public static Set<WorkflowVersion>[] workflowsInDate;
 
     public static ArrayList<Date> uniqueSortedDates;
-    public static Integer[] newEdges;
+    public static int[] newEdges;
 
     public static void main(String... args) {
         try {
@@ -77,8 +77,8 @@ public class EvaluateDataCentricRecommendation {
     private static void calculatePrecisions() {
         print("In Precision Evaluation");
 
-        Integer[] totalReported = new Integer[NUMBER_OF_UNIQUE_DATES];
-        Integer[] correctlyPredicted = new Integer[NUMBER_OF_UNIQUE_DATES];
+        int[] totalReported = new int[NUMBER_OF_UNIQUE_DATES];
+        int[] correctlyPredicted = new int[NUMBER_OF_UNIQUE_DATES];
         long[] time = new long[NUMBER_OF_UNIQUE_DATES];
         for(int timeIndex=0; timeIndex<NUMBER_OF_UNIQUE_DATES-1; timeIndex++){
             if(newEdges[timeIndex+1]!=0) {
@@ -106,7 +106,7 @@ public class EvaluateDataCentricRecommendation {
             }
         }
         //It should be noted that the time index that we get the results for are actually timeIndex+1
-        Double[] precisions = new Double[NUMBER_OF_UNIQUE_DATES];
+        double[] precisions = new double[NUMBER_OF_UNIQUE_DATES];
         for(int timeIndex=1; timeIndex<NUMBER_OF_UNIQUE_DATES; timeIndex++){
             if(totalReported[timeIndex]!=0){
                 precisions[timeIndex] = (double) correctlyPredicted[timeIndex]/totalReported[timeIndex];
@@ -123,8 +123,8 @@ public class EvaluateDataCentricRecommendation {
 
         print("In Recall Evaluation");
 
-        newEdges = new Integer[NUMBER_OF_UNIQUE_DATES];
-        Integer[] canBePredicted = new Integer[NUMBER_OF_UNIQUE_DATES];
+        newEdges = new int[NUMBER_OF_UNIQUE_DATES];
+        int[] canBePredicted = new int[NUMBER_OF_UNIQUE_DATES];
         for(int timeIndex=0; timeIndex< NUMBER_OF_UNIQUE_DATES-1; timeIndex++){
             print("Evaluating time = "+ (timeIndex+1));
             Graph<String, DefaultEdge> testGraph = incompleteSimpleGraph[timeIndex + 1];
@@ -151,12 +151,12 @@ public class EvaluateDataCentricRecommendation {
         }
 
         //It should be noted that the time index that we get the results for are actually timeIndex+1
-        Double[] recalls = new Double[NUMBER_OF_UNIQUE_DATES];
+        double[] recalls = new double[NUMBER_OF_UNIQUE_DATES];
         for(int timeIndex=1; timeIndex<NUMBER_OF_UNIQUE_DATES; timeIndex++){
             if(newEdges[timeIndex]!=0){
                 recalls[timeIndex] = (double) canBePredicted[timeIndex]/newEdges[timeIndex];
             }else{
-                recalls[timeIndex] = 0.;
+                recalls[timeIndex] = 0.;;
             }
         }
 
