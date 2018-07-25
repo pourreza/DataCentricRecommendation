@@ -7,21 +7,21 @@ import org.jgrapht.alg.shortestpath.DijkstraShortestPath;
 import org.jgrapht.graph.DefaultEdge;
 import org.jgrapht.graph.DefaultWeightedEdge;
 import org.jgrapht.graph.SimpleDirectedGraph;
+import scala.tools.cmd.gen.AnyVals;
 import serviceWorkflowNetwork.OOperation;
 import serviceWorkflowNetwork.SService;
 import serviceWorkflowNetwork.WorkflowVersion;
 
 import java.util.*;
 
-import static utilities.Printer.print;
-import static utilities.Printer.printJSONListInFile;
+import static utilities.Printer.*;
 import static utilities.PythonInterpreter2.getCosineSimilarity;
 
 public class DataCentricRecommendation {
 
-    public static final int MAX_PATH_LENGTH = 5;
-    private final double INTENT_IMPORTANCE = 0.4;
-    private final double CONTEXT_IMPORTANCE = 0.4;
+    public static final int MAX_PATH_LENGTH = 7;
+    private final double INTENT_IMPORTANCE = 0.5;
+    private final double CONTEXT_IMPORTANCE = 0.5;
     private final double PATH_LENGTH_IMPORTANCE = 0.2;
     private final Graph<String, DefaultWeightedEdge> weightedGraph;
     private Graph<String, DefaultEdge> graph;
@@ -136,7 +136,7 @@ public class DataCentricRecommendation {
         for(Pair<String, String> newPair: newEdgesSource){
             for(CandidateScore candidatePair: candidateScores){
                 if(candidatePair.candidate.getFirst().equals(newPair.getFirst()) && candidatePair.candidate.getSecond().equals(newPair.getSecond())){
-                    print("WEEEEEEE have it in candidate scoressss with index "+ candidateScores.indexOf(candidatePair));
+                    print("WEEEEEEE have it in candidate scoressss with index "+ candidateScores.indexOf(candidatePair) + " With score: "+ candidatePair.d);
                 }
             }
         }
@@ -146,12 +146,22 @@ public class DataCentricRecommendation {
 //        for(CandidateScore candidateScore: candidateScores){
 //            recommendedCandidates.add(candidateScore.candidate);
 //        }
-        return getTop10(candidateScores);
+        ArrayList<Pair<String, String>> top15 = getTop15(candidateScores);
+        for(Pair<String, String> newPair: newEdgesSource) {
+            for (Pair<String, String> pair : top15) {
+                if (pair.getFirst().equals(newPair.getFirst()) && pair.getSecond().equals(newPair.getSecond()))
+                {
+                    System.out.println("I have it in to 10000000000000000000000000000000000000000000");
+                }
+
+            }
+        }
+        return top15;
     }
 
-    private ArrayList<Pair<String, String>> getTop10(ArrayList<CandidateScore> candidateScores) {
+    private ArrayList<Pair<String, String>> getTop15(ArrayList<CandidateScore> candidateScores) {
         ArrayList<Pair<String, String>> sortedCandidates = new ArrayList<Pair<String, String>>();
-        int total = 10;
+        int total = 15;
         if(candidateScores.size()<total)
             total = candidateScores.size();
         for(int i=0; i<total; i++){
@@ -162,6 +172,7 @@ public class DataCentricRecommendation {
                     print("This is the new max: "+ max.d);
                 }
             }
+            print("top 10: " + max.candidate + " "+ max.d);
             sortedCandidates.add(new Pair<String, String>(max.candidate.getFirst(), max.candidate.getSecond()));
             candidateScores.remove(max);
         }
@@ -183,9 +194,12 @@ public class DataCentricRecommendation {
                         if(!graph.containsEdge(source, target)){// If this edge was not previously in the graph
                             DijkstraShortestPath<String, DefaultEdge> dijkstraAlg = new DijkstraShortestPath<String, DefaultEdge>(graph);
                             GraphPath<String, DefaultEdge> path = dijkstraAlg.getPaths(source).getPath(target);
+                            if(path!=null){
+                                System.out.println("Candidate path lengthhhhhhhhhhhhhhhhhhh: "+ path.getLength());
+                            }
                             if (path != null && path.getLength()<MAX_PATH_LENGTH) {
                                 if(target.equals(servicePair.getSecond())){
-                                    System.out.println("Added the Candidateeeeeeeeeee!!!");
+                                    System.out.println("Added the Candidateeeeeeeeeee!!! "+ path.getLength());
                                 }
                                 candidates.add(new Pair<String, String>(source, target));
                             }
