@@ -1,6 +1,5 @@
 package DataCentricRecommendation;
 
-import breeze.stats.distributions.Rand;
 import org.apache.commons.math3.util.Pair;
 import org.jgrapht.Graph;
 import org.jgrapht.GraphPath;
@@ -14,6 +13,8 @@ import serviceWorkflowNetwork.WorkflowVersion;
 
 import java.util.*;
 
+import static utilities.Printer.print;
+import static utilities.Printer.printJSONListInFile;
 import static utilities.PythonInterpreter2.getCosineSimilarity;
 
 public class DataCentricRecommendation {
@@ -109,40 +110,48 @@ public class DataCentricRecommendation {
         return getCosineSimilarity(serviceMap.get(service1).getIntent(), serviceMap.get(service2).getIntent());
     }
 
-    public ArrayList<Pair<String, String>> recommend() {
-        ArrayList<Pair<String, String>> candidates = findCandidates();
+    public ArrayList<Pair<String, String>> recommend(ArrayList<Pair<String, String>> newEdgesSource) {
+        System.out.println("New Edges: "+ newEdgesSource.size());
+        ArrayList<Pair<String, String>> candidates = findCandidates(newEdgesSource);
         ArrayList<CandidateScore> candidateScores = new ArrayList<CandidateScore>();
-        int maxTries = 100;
+        int maxTries = 50;
         if(candidates.size()<maxTries) {
             maxTries = candidates.size();
         }
 
         System.out.print("candidateSize: "+ candidates.size() + " maxTries: " + maxTries);
-        for(int i=0; i<maxTries; i++){
-            Random r = new Random(123);
-            int index  = r.nextInt(candidates.size());
-            double score = getScore(serviceMap.get(candidates.get(index).getFirst()), serviceMap.get(candidates.get(index).getSecond()));
-            CandidateScore cnd = new CandidateScore(candidates.get(index), score);
-            candidateScores.add(cnd);
-        }
-//        for(Pair<String, String> candidate: candidates){
-//            System.out.print(".");
-//            double score = getScore(serviceMap.get(candidate.getFirst()), serviceMap.get(candidate.getSecond()));
-//            CandidateScore cnd = new CandidateScore(candidate, score);
+//        for(int i=0; i<maxTries; i++){
+//            Random r = new Random(123);
+//            int index  = r.nextInt(candidates.size());
+//            double score = getScore(serviceMap.get(candidates.get(index).getFirst()), serviceMap.get(candidates.get(index).getSecond()));
+//            CandidateScore cnd = new CandidateScore(candidates.get(index), score);
 //            candidateScores.add(cnd);
 //        }
+        for(Pair<String, String> candidate: candidates){
+            System.out.print(".");
+            double score = getScore(serviceMap.get(candidate.getFirst()), serviceMap.get(candidate.getSecond()));
+            CandidateScore cnd = new CandidateScore(candidate, score);
+            candidateScores.add(cnd);
+        }
+        for(Pair<String, String> newPair: newEdgesSource){
+            for(CandidateScore candidatePair: candidateScores){
+                if(candidatePair.candidate.getFirst().equals(newPair.getFirst()) && candidatePair.candidate.getSecond().equals(newPair.getSecond())){
+                    print("WEEEEEEE have it in candidate scoressss with index "+ candidateScores.indexOf(candidatePair));
+                }
+            }
+        }
         System.out.println(" Done");
 //        Collections.sort(candidateScores);
 //        ArrayList<Pair<String, String>> recommendedCandidates = new ArrayList<Pair<String, String>>();
 //        for(CandidateScore candidateScore: candidateScores){
 //            recommendedCandidates.add(candidateScore.candidate);
 //        }
-        return getTop5(candidateScores);
+        return getTop10(candidateScores);
     }
 
-    private ArrayList<Pair<String, String>> getTop5(ArrayList<CandidateScore> candidateScores) {
+    private ArrayList<Pair<String, String>> getTop10(ArrayList<CandidateScore> candidateScores) {
         ArrayList<Pair<String, String>> sortedCandidates = new ArrayList<Pair<String, String>>();
-        int total = 5;
+        int total = 10;
         if(candidateScores.size()<total)
             total = candidateScores.size();
         for(int i=0; i<total; i++){
@@ -150,6 +159,7 @@ public class DataCentricRecommendation {
             for(CandidateScore candidateScore: candidateScores){
                 if(max==null || candidateScore.d>max.d){
                     max = candidateScore;
+                    print("This is the new max: "+ max.d);
                 }
             }
             sortedCandidates.add(new Pair<String, String>(max.candidate.getFirst(), max.candidate.getSecond()));
@@ -158,18 +168,25 @@ public class DataCentricRecommendation {
         return sortedCandidates;
     }
 
-    private ArrayList<Pair<String, String>> findCandidates() {
+    private ArrayList<Pair<String, String>> findCandidates(ArrayList<Pair<String, String>> newEdgesSource) {
         ArrayList<Pair<String, String>> candidates = new ArrayList<Pair<String, String>>();
-        for(SService service1: services){
+        for(Pair<String, String> servicePair: newEdgesSource){
+            String service1 = servicePair.getFirst();
             for(SService service2: services){
-                if(!service1.equals(service2)){
-                    String source = service1.getURL();
+                if(!service1.equals(service2.getURL())){
+                    String source = service1;
                     String target = service2.getURL();
+                    if(target.equals(servicePair.getSecond())){
+                        System.out.println("FOUUUUUUUUUUUUUNDDDDD ITTTTTTT");
+                    }
                     if(graph.containsVertex(source)&& graph.containsVertex(target)){
                         if(!graph.containsEdge(source, target)){// If this edge was not previously in the graph
                             DijkstraShortestPath<String, DefaultEdge> dijkstraAlg = new DijkstraShortestPath<String, DefaultEdge>(graph);
                             GraphPath<String, DefaultEdge> path = dijkstraAlg.getPaths(source).getPath(target);
                             if (path != null && path.getLength()<MAX_PATH_LENGTH) {
+                                if(target.equals(servicePair.getSecond())){
+                                    System.out.println("Added the Candidateeeeeeeeeee!!!");
+                                }
                                 candidates.add(new Pair<String, String>(source, target));
                             }
                         }

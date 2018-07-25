@@ -32,6 +32,7 @@ public class EvaluateDataCentricRecommendation {
 
     public static ArrayList<Date> uniqueSortedDates;
     public static int[] newEdges;
+    public static ArrayList<Pair<String, String>>[] newEdgesSources;
 
     public static void main(String... args) {
         try {
@@ -82,15 +83,12 @@ public class EvaluateDataCentricRecommendation {
         long[] time = new long[NUMBER_OF_UNIQUE_DATES];
         for(int timeIndex=0; timeIndex<NUMBER_OF_UNIQUE_DATES-1; timeIndex++){
             if(newEdges[timeIndex+1]!=0) {
-                if (timeIndex == 34) {
-                    print("HI");
-                }
                 print("Evaluating time = " + (timeIndex + 1));
                 Map<String, SService> serviceMap = createServiceMap(servicesWithLocalsInDate[timeIndex], timeIndex);
                 long beforeTime = System.currentTimeMillis();
                 Graph<String, DefaultWeightedEdge> completeGraphWithReverseEdges = addReverseEdgesToWeightedGraph(completeGraph[timeIndex]);
                 DataCentricRecommendation recommendation = new DataCentricRecommendation(completeGraphWithReverseEdges, workflowsInDate[timeIndex], servicesInDate[timeIndex], serviceMap);
-                ArrayList<Pair<String, String>> recommendedEdges = recommendation.recommend();
+                ArrayList<Pair<String, String>> recommendedEdges = recommendation.recommend(newEdgesSources[timeIndex+1]);
                 long endTime = System.currentTimeMillis();
                 time[timeIndex] = endTime - beforeTime;
                 if (recommendedEdges != null) {
@@ -115,8 +113,8 @@ public class EvaluateDataCentricRecommendation {
             }
         }
 
-        Printer.saveToExcel(uniqueSortedDates, time, "Times-v0.xlsx");
-        Printer.saveToExcel(uniqueSortedDates, totalReported, correctlyPredicted, precisions, "Precisions-v0.xlsx");
+        Printer.saveToExcel(uniqueSortedDates, time, "Times-v2.xlsx");
+        Printer.saveToExcel(uniqueSortedDates, totalReported, correctlyPredicted, precisions, "Precisions-v2.xlsx");
     }
 
     private static void findRecalls() {
@@ -124,11 +122,14 @@ public class EvaluateDataCentricRecommendation {
         print("In Recall Evaluation");
 
         newEdges = new int[NUMBER_OF_UNIQUE_DATES];
+        newEdgesSources = new ArrayList[NUMBER_OF_UNIQUE_DATES];
+        newEdgesSources[0] = new ArrayList<Pair<String, String>>();
         int[] canBePredicted = new int[NUMBER_OF_UNIQUE_DATES];
         for(int timeIndex=0; timeIndex< NUMBER_OF_UNIQUE_DATES-1; timeIndex++){
             print("Evaluating time = "+ (timeIndex+1));
             Graph<String, DefaultEdge> testGraph = incompleteSimpleGraph[timeIndex + 1];
             int countNewEdges = 0;
+            newEdgesSources[timeIndex+1] = new ArrayList<Pair<String, String>>();
             int couldBePredicted = 0;
             Map<String, SService> serviceMap = createServiceMap(servicesInDate[timeIndex], timeIndex);
             Graph<String, DefaultEdge> completeGraphWithReverseEdges = addReverseEdgesToGraph(completeSimpleGraph[timeIndex]);
@@ -137,6 +138,7 @@ public class EvaluateDataCentricRecommendation {
                 String target = testGraph.getEdgeTarget(edge);
                 if(serviceMap.containsKey(source) && serviceMap.containsKey(target) && !incompleteSimpleGraph[timeIndex].containsEdge(source, target)){
                     countNewEdges++;
+                    newEdgesSources[timeIndex+1].add(new Pair<String, String>(source, target));
                     if(completeGraphWithReverseEdges.containsVertex(source) && completeGraphWithReverseEdges.containsVertex(target)) {
                         DijkstraShortestPath<String, DefaultEdge> dijkstraAlg = new DijkstraShortestPath<String, DefaultEdge>(completeGraphWithReverseEdges);
                         GraphPath<String, DefaultEdge> path = dijkstraAlg.getPaths(source).getPath(target);
@@ -160,7 +162,7 @@ public class EvaluateDataCentricRecommendation {
             }
         }
 
-        Printer.saveToExcel(uniqueSortedDates, newEdges, canBePredicted, recalls, "Recalls-v1.xlsx");
+        Printer.saveToExcel(uniqueSortedDates, newEdges, canBePredicted, recalls, "Recalls-v2.xlsx");
     }
 
     private static boolean containsSourceTargetServices(Set<SService> sServices, Graph<String, DefaultEdge> testGraph, DefaultEdge edge) {
