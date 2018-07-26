@@ -7,10 +7,7 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.json.simple.JSONObject;
 import serviceWorkflowNetwork.WorkflowVersion;
 
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.PrintWriter;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -233,9 +230,9 @@ public class Printer {
         headerRow.createCell(1).setCellValue("Month");
         headerRow.createCell(2).setCellValue("Day");
         headerRow.createCell(3).setCellValue("Time");
-        headerRow.createCell(4).setCellValue("Number of correctly predicted edges");
-        headerRow.createCell(5).setCellValue("Number of predicted edges");
-        headerRow.createCell(6).setCellValue("Precision");
+        headerRow.createCell(4).setCellValue("Number of potential edges");
+        headerRow.createCell(5).setCellValue("Number of new edges");
+        headerRow.createCell(6).setCellValue("Recall");
 
         for (int index = 1; index < uniqueSortedDates.size()-1; index++) {
             Row results = sheet.createRow(index + 1);
@@ -251,7 +248,7 @@ public class Printer {
         writeToFile(fileName, workbook);
     }
 
-    public static void saveToExcel(ArrayList<Date> uniqueSortedDates, long[] time, String fileName) {
+    public static void saveToExcel(ArrayList<Date> uniqueSortedDates, ArrayList<Long> time, String fileName) {
         Workbook workbook = new XSSFWorkbook(); // new HSSFWorkbook() for generating `.xls` file
         Sheet sheet = workbook.createSheet("Results");
 
@@ -268,7 +265,7 @@ public class Printer {
             results.createCell(1).setCellValue(uniqueSortedDates.get(index).getMonth());
             results.createCell(2).setCellValue(uniqueSortedDates.get(index).getDate());
             results.createCell(3).setCellValue(uniqueSortedDates.get(index).getTime());
-            results.createCell(4).setCellValue(time[index]);
+            results.createCell(4).setCellValue(time.get(index));
         }
 
         writeToFile(fileName, workbook);
@@ -284,5 +281,83 @@ public class Printer {
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    public static void saveToExcel(ArrayList<Date> dates, ArrayList<Integer> totalReported, ArrayList<Integer> correctlyPredicted, ArrayList<Double> precisions, String fileName) {
+        print("Started writing in excel file");
+
+        Workbook workbook = new XSSFWorkbook(); // new HSSFWorkbook() for generating `.xls` file
+        Sheet sheet = workbook.createSheet("Results");
+
+        Row headerRow = sheet.createRow(0);
+        headerRow.createCell(0).setCellValue("Year");
+        headerRow.createCell(1).setCellValue("Month");
+        headerRow.createCell(2).setCellValue("Day");
+        headerRow.createCell(3).setCellValue("Time");
+        headerRow.createCell(4).setCellValue("Number of correctly predicted edges");
+        headerRow.createCell(5).setCellValue("Number of predicted edges");
+        headerRow.createCell(6).setCellValue("Precision");
+
+        for (int index = 0; index < dates.size(); index++) {
+            Row results = sheet.createRow(index + 1);
+            results.createCell(0).setCellValue(dates.get(index).getYear());
+            results.createCell(1).setCellValue(dates.get(index).getMonth());
+            results.createCell(2).setCellValue(dates.get(index).getDate());
+            results.createCell(3).setCellValue(dates.get(index).getTime());
+            results.createCell(4).setCellValue(correctlyPredicted.get(index));
+            results.createCell(5).setCellValue(totalReported.get(index));
+            results.createCell(6).setCellValue(precisions.get(index));
+        }
+
+        writeToFile(fileName, workbook);
+    }
+
+    public static void writeToFile(String str, String fileName) {
+        try {
+            BufferedWriter writer = new BufferedWriter(new FileWriter(fileName));
+            writer.write(str);
+            writer.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static void saveToExcel(ArrayList<Date> dates, ArrayList<Integer> allNewOnes, ArrayList<Integer> potentialEdges, ArrayList<Integer> candidateListSize, ArrayList<String> ranksInCandidateList, ArrayList<String> candidatesScores, ArrayList<Double> minScores, ArrayList<Double> maxScores, ArrayList<Long> time, String fileName) {
+        print("Started writing in excel file");
+
+        Workbook workbook = new XSSFWorkbook(); // new HSSFWorkbook() for generating `.xls` file
+        Sheet sheet = workbook.createSheet("Results");
+
+        Row headerRow = sheet.createRow(0);
+        headerRow.createCell(0).setCellValue("Year");
+        headerRow.createCell(1).setCellValue("Month");
+        headerRow.createCell(2).setCellValue("Day");
+        headerRow.createCell(3).setCellValue("Time");
+        headerRow.createCell(4).setCellValue("New Ones");
+        headerRow.createCell(5).setCellValue("Potentials");
+        headerRow.createCell(6).setCellValue("CandidateSize");
+        headerRow.createCell(7).setCellValue("Ranks");
+        headerRow.createCell(8).setCellValue("Scores");
+        headerRow.createCell(9).setCellValue("Min Score");
+        headerRow.createCell(10).setCellValue("Max Score");
+        headerRow.createCell(11).setCellValue("Duration");
+
+        for (int index = 0; index < dates.size(); index++) {
+            Row results = sheet.createRow(index + 1);
+            results.createCell(0).setCellValue(dates.get(index).getYear());
+            results.createCell(1).setCellValue(dates.get(index).getMonth());
+            results.createCell(2).setCellValue(dates.get(index).getDate());
+            results.createCell(3).setCellValue(dates.get(index).getTime());
+            results.createCell(4).setCellValue(allNewOnes.get(index));
+            results.createCell(5).setCellValue(potentialEdges.get(index));
+            results.createCell(6).setCellValue(candidateListSize.get(index));
+            results.createCell(7).setCellValue(ranksInCandidateList.get(index));
+            results.createCell(8).setCellValue(candidatesScores.get(index));
+            results.createCell(9).setCellValue(minScores.get(index));
+            results.createCell(10).setCellValue(maxScores.get(index));
+            results.createCell(11).setCellValue(time.get(index));
+        }
+
+        writeToFile(fileName, workbook);
     }
 }

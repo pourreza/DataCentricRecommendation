@@ -6,7 +6,6 @@ import org.jgrapht.Graph;
 import org.jgrapht.GraphPath;
 import org.jgrapht.alg.shortestpath.DijkstraShortestPath;
 import org.jgrapht.graph.*;
-import scala.tools.nsc.doc.model.Def;
 import serviceWorkflowNetwork.*;
 import utilities.Printer;
 
@@ -32,7 +31,9 @@ public class EvaluateDataCentricRecommendation {
 
     public static ArrayList<Date> uniqueSortedDates;
     public static int[] newEdges;
+    public static int[] canBePredicted;
     public static ArrayList<Pair<String, String>>[] newEdgesSources;
+    public static ArrayList<Pair<String, String>>[] potentialOnes;
 
     public static void main(String... args) {
         try {
@@ -44,9 +45,17 @@ public class EvaluateDataCentricRecommendation {
         }
 
         findRecalls();
-        calculatePrecisions();
+        for(double intentWeigth = 0.1; intentWeigth<=0.8; intentWeigth+=0.1){
+            for(double contextWeight = 0.1; contextWeight<(1-intentWeigth); contextWeight+=0.1){
+                double pathLengthWeight = 1-intentWeigth - contextWeight;
+                print("Test for these weights: " + intentWeigth + "-" + contextWeight + "-" + pathLengthWeight);
+                calculatePrecisions(intentWeigth, contextWeight, pathLengthWeight);
+            }
+        }
+//        initialDatasetEvaluation();
+    }
 
-
+    private static void initialDatasetEvaluation() {
 //        int initialNodes = inclompleteGraph.vertexSet().size();
 //        int newNodes = completeGraph.vertexSet().size();
 //        int initialEdges = inclompleteGraph.edgeSet().size();
@@ -72,49 +81,95 @@ public class EvaluateDataCentricRecommendation {
 //        print("Number of connected nodes in initial undirected graph: " + undirectedWithoutLocals);
 //        print("Number of connected nodes in new graph with local workers and undirected: " + undirectedWithLocals);
 //        print("********************************************");
-
     }
 
-    private static void calculatePrecisions() {
+    private static void prepareTransEInputs() {
+        int countFile = 0;
+        for(int timeIndex=0; timeIndex<NUMBER_OF_UNIQUE_DATES-1; timeIndex++) {
+            if (canBePredicted[timeIndex + 1] != 0) {
+                countFile++;
+                String train = "";
+                Graph<String, DefaultWeightedEdge> completeGraphWithReverseEdges = addReverseEdgesToWeightedGraph(completeGraph[timeIndex]);
+                for(DefaultWeightedEdge edge: completeGraphWithReverseEdges.edgeSet()){
+                    String edgeSource = completeGraphWithReverseEdges.getEdgeSource(edge);
+                    String edgeTarget = completeGraphWithReverseEdges.getEdgeTarget(edge);
+                    train +=(edgeSource +" "+ edgeTarget +" FB \n");
+                }
+                int nodeId = 0;
+                String entity2id = "";
+                for(String node:completeSimpleGraph[timeIndex].vertexSet()){
+                    entity2id += (node + " "+nodeId + "\n");
+                    nodeId++;
+                }
+                String trainFileName = "train" + countFile + ".txt";
+                print("Writing in file: "+ trainFileName);
+                Printer.writeToFile(train, trainFileName);
+                String entityFileName = "entity2id" + countFile + ".txt";
+                print("Writing in file: "+ entityFileName);
+                Printer.writeToFile(entity2id, entityFileName);
+            }
+        }
+    }
+
+    private static void calculatePrecisions(double intentWeigth, double contextWeight, double pathLengthWeight) {
         print("In Precision Evaluation");
 
-        int[] totalReported = new int[NUMBER_OF_UNIQUE_DATES];
-        int[] correctlyPredicted = new int[NUMBER_OF_UNIQUE_DATES];
-        long[] time = new long[NUMBER_OF_UNIQUE_DATES];
-        for(int timeIndex=0; timeIndex<NUMBER_OF_UNIQUE_DATES-1; timeIndex++){
-            if(newEdges[timeIndex+1]!=0) {
+        ArrayList<Date> importantDates = new ArrayList<Date>();
+        ArrayList<Long> time = new ArrayList<Long>();
+
+        ArrayList<Integer> allNewOnes = new ArrayList<Integer>();
+        ArrayList<Integer> potentialEdges = new ArrayList<Integer>();
+
+        ArrayList<String> ranksInCandidateList = new ArrayList<String>();
+        ArrayList<Integer> candidateListSize = new ArrayList<Integer>();
+        ArrayList<Double> maxScores = new ArrayList<Double>();
+        ArrayList<Double> minScores = new ArrayList<Double>();
+        ArrayList<String> candidatesScores = new ArrayList<String>();
+
+        for(int timeIndex=0; timeIndex<NUMBER_OF_UNIQUE_DATES; timeIndex++){
+            if(canBePredicted[timeIndex+1]!=0) {
+                importantDates.add(uniqueSortedDates.get(timeIndex+1));
+                allNewOnes.add(newEdgesSources[timeIndex+1].size());
+                potentialEdges.add(canBePredicted[timeIndex+1]);
+
                 print("Evaluating time = " + (timeIndex + 1));
                 Map<String, SService> serviceMap = createServiceMap(servicesWithLocalsInDate[timeIndex], timeIndex);
-                long beforeTime = System.currentTimeMillis();
                 Graph<String, DefaultWeightedEdge> completeGraphWithReverseEdges = addReverseEdgesToWeightedGraph(completeGraph[timeIndex]);
-                DataCentricRecommendation recommendation = new DataCentricRecommendation(completeGraphWithReverseEdges, workflowsInDate[timeIndex], servicesInDate[timeIndex], serviceMap);
-                ArrayList<Pair<String, String>> recommendedEdges = recommendation.recommend(newEdgesSources[timeIndex+1]);
+                DataCentricRecommendation recommendation = new DataCentricRecommendation(completeGraphWithReverseEdges, workflowsInDate[timeIndex], servicesInDate[timeIndex], serviceMap, incompleteSimpleGraph[timeIndex], intentWeigth, contextWeight, pathLengthWeight);
+                long beforeTime = System.currentTimeMillis();
+                int recommededCandidates = recommendation.recommend(newEdgesSources[timeIndex+1]);
                 long endTime = System.currentTimeMillis();
-                time[timeIndex] = endTime - beforeTime;
-                if (recommendedEdges != null) {
-                    totalReported[timeIndex + 1] = recommendedEdges.size();
-                    int correctOnes = 0;
-                    for (int recommedationIndex = 0; recommedationIndex < recommendedEdges.size(); recommedationIndex++) {
-                        if (incompleteSimpleGraph[timeIndex + 1].containsEdge(recommendedEdges.get(recommedationIndex).getFirst(), recommendedEdges.get(recommedationIndex).getSecond())) {
-                            correctOnes++;
-                        }
-                    }
-                    correctlyPredicted[timeIndex + 1] = correctOnes;
-                }
+                candidateListSize.add(recommededCandidates);
+                ranksInCandidateList.add(recommendation.getRanks(potentialOnes[timeIndex+1]));
+                candidatesScores.add(recommendation.getScores(potentialOnes[timeIndex+1]));
+                minScores.add(recommendation.getMinScore());
+                maxScores.add(recommendation.getMaxScore());
+                time.add(endTime - beforeTime);
+//                if (recommendedEdges != null) {
+//                    totalReported.add(recommendedEdges.size());
+//                    int correctOnes = 0;
+//                    for (int recommedationIndex = 0; recommedationIndex < recommendedEdges.size(); recommedationIndex++) {
+//                        if (incompleteSimpleGraph[timeIndex + 1].containsEdge(recommendedEdges.get(recommedationIndex).getFirst(), recommendedEdges.get(recommedationIndex).getSecond())) {
+//                            correctOnes++;
+//                        }
+//                    }
+//                    correctlyPredicted.add(correctOnes);
+//                }
             }
         }
         //It should be noted that the time index that we get the results for are actually timeIndex+1
-        double[] precisions = new double[NUMBER_OF_UNIQUE_DATES];
-        for(int timeIndex=1; timeIndex<NUMBER_OF_UNIQUE_DATES; timeIndex++){
-            if(totalReported[timeIndex]!=0){
-                precisions[timeIndex] = (double) correctlyPredicted[timeIndex]/totalReported[timeIndex];
-            }else{
-                precisions[timeIndex] = 0.;
-            }
-        }
+//        for(int timeIndex=0; timeIndex<totalReported.size(); timeIndex++){
+//            if(totalReported.get(timeIndex)!=0){
+//                precisions.add((double) correctlyPredicted.get(timeIndex)/totalReported.get(timeIndex));
+//            }else{
+//                precisions.add(0.);
+//            }
+//        }
 
-        Printer.saveToExcel(uniqueSortedDates, time, "Times-v2.xlsx");
-        Printer.saveToExcel(uniqueSortedDates, totalReported, correctlyPredicted, precisions, "Precisions-v2.xlsx");
+        String fileIndex = "-" + intentWeigth + "-" + contextWeight + "-" + pathLengthWeight;
+
+//        Printer.saveToExcel(importantDates, time, "Times"+fileIndex+".xlsx");
+        Printer.saveToExcel(importantDates, allNewOnes, potentialEdges, candidateListSize, ranksInCandidateList, candidatesScores, minScores, maxScores, time, "All-Results"+fileIndex+".xlsx");
     }
 
     private static void findRecalls() {
@@ -123,13 +178,16 @@ public class EvaluateDataCentricRecommendation {
 
         newEdges = new int[NUMBER_OF_UNIQUE_DATES];
         newEdgesSources = new ArrayList[NUMBER_OF_UNIQUE_DATES];
+        potentialOnes = new ArrayList[NUMBER_OF_UNIQUE_DATES];
         newEdgesSources[0] = new ArrayList<Pair<String, String>>();
-        int[] canBePredicted = new int[NUMBER_OF_UNIQUE_DATES];
+        canBePredicted = new int[NUMBER_OF_UNIQUE_DATES];
+
         for(int timeIndex=0; timeIndex< NUMBER_OF_UNIQUE_DATES-1; timeIndex++){
             print("Evaluating time = "+ (timeIndex+1));
             Graph<String, DefaultEdge> testGraph = incompleteSimpleGraph[timeIndex + 1];
             int countNewEdges = 0;
             newEdgesSources[timeIndex+1] = new ArrayList<Pair<String, String>>();
+            potentialOnes[timeIndex+1] = new ArrayList<Pair<String, String>>();
             int couldBePredicted = 0;
             Map<String, SService> serviceMap = createServiceMap(servicesInDate[timeIndex], timeIndex);
             Graph<String, DefaultEdge> completeGraphWithReverseEdges = addReverseEdgesToGraph(completeSimpleGraph[timeIndex]);
@@ -144,6 +202,7 @@ public class EvaluateDataCentricRecommendation {
                         GraphPath<String, DefaultEdge> path = dijkstraAlg.getPaths(source).getPath(target);
                         if (path != null) {
                             couldBePredicted++;
+                            potentialOnes[timeIndex+1].add(new Pair<String, String>(source, target));
                         }
                     }
                 }
@@ -162,7 +221,7 @@ public class EvaluateDataCentricRecommendation {
             }
         }
 
-        Printer.saveToExcel(uniqueSortedDates, newEdges, canBePredicted, recalls, "Recalls-v2.xlsx");
+        Printer.saveToExcel(uniqueSortedDates, newEdges, canBePredicted, recalls, "Recalls-v3.xlsx");
     }
 
     private static boolean containsSourceTargetServices(Set<SService> sServices, Graph<String, DefaultEdge> testGraph, DefaultEdge edge) {
