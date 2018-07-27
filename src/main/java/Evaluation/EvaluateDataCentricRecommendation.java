@@ -45,13 +45,14 @@ public class EvaluateDataCentricRecommendation {
         }
 
         findRecalls();
-        for(double intentWeigth = 0.1; intentWeigth<=0.8; intentWeigth+=0.1){
-            for(double contextWeight = 0.1; contextWeight<(1-intentWeigth); contextWeight+=0.1){
-                double pathLengthWeight = 1-intentWeigth - contextWeight;
-                print("Test for these weights: " + intentWeigth + "-" + contextWeight + "-" + pathLengthWeight);
-                calculatePrecisions(intentWeigth, contextWeight, pathLengthWeight);
-            }
-        }
+        prepareTransEInputs();
+//        for(double intentWeigth = 0.3; intentWeigth<=0.8; intentWeigth+=0.1){
+//            for(double contextWeight = 0.3; contextWeight<(1-intentWeigth); contextWeight+=0.1){
+//                double pathLengthWeight = 1-intentWeigth - contextWeight;
+//                print("Test for these weights: " + intentWeigth + "-" + contextWeight + "-" + pathLengthWeight);
+//                calculatePrecisions(intentWeigth, contextWeight, pathLengthWeight);
+//            }
+//        }
 //        initialDatasetEvaluation();
     }
 
@@ -85,6 +86,7 @@ public class EvaluateDataCentricRecommendation {
 
     private static void prepareTransEInputs() {
         int countFile = 0;
+        Map<String, Integer> paperIds = new HashMap<String, Integer>();
         for(int timeIndex=0; timeIndex<NUMBER_OF_UNIQUE_DATES-1; timeIndex++) {
             if (canBePredicted[timeIndex + 1] != 0) {
                 countFile++;
@@ -126,7 +128,7 @@ public class EvaluateDataCentricRecommendation {
         ArrayList<Double> minScores = new ArrayList<Double>();
         ArrayList<String> candidatesScores = new ArrayList<String>();
 
-        for(int timeIndex=0; timeIndex<NUMBER_OF_UNIQUE_DATES; timeIndex++){
+        for(int timeIndex=0; timeIndex<NUMBER_OF_UNIQUE_DATES-1; timeIndex++){
             if(canBePredicted[timeIndex+1]!=0) {
                 importantDates.add(uniqueSortedDates.get(timeIndex+1));
                 allNewOnes.add(newEdgesSources[timeIndex+1].size());
