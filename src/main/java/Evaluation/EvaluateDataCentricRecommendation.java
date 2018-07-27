@@ -35,6 +35,10 @@ public class EvaluateDataCentricRecommendation {
     public static ArrayList<Pair<String, String>>[] newEdgesSources;
     public static ArrayList<Pair<String, String>>[] potentialOnes;
 
+    public static Map<String, Integer> vertexIds = new HashMap<String, Integer>();
+    private static ArrayList<ArrayList<Double>> nodeVector;
+    private static ArrayList<Double> edgeVector;
+
     public static void main(String... args) {
         try {
             init();
@@ -44,8 +48,12 @@ public class EvaluateDataCentricRecommendation {
             e.printStackTrace();
         }
 
-        findRecalls();
+//        findRecalls();
         prepareTransEInputs();
+
+        readTransEResutls();
+//
+        testTransE();
 //        for(double intentWeigth = 0.3; intentWeigth<=0.8; intentWeigth+=0.1){
 //            for(double contextWeight = 0.3; contextWeight<(1-intentWeigth); contextWeight+=0.1){
 //                double pathLengthWeight = 1-intentWeigth - contextWeight;
@@ -54,6 +62,36 @@ public class EvaluateDataCentricRecommendation {
 //            }
 //        }
 //        initialDatasetEvaluation();
+    }
+
+    private static void readTransEResutls() {
+
+    }
+
+    private static void testTransE() {
+
+        Graph<String, DefaultEdge> testGraph = incompleteSimpleGraph[NUMBER_OF_UNIQUE_DATES - 1];
+        ArrayList<Double> distances = new ArrayList<Double>();
+
+        for(DefaultEdge edge: testGraph.edgeSet()){
+            String edgeSource = testGraph.getEdgeSource(edge);
+            String edgeTarget = testGraph.getEdgeTarget(edge);
+            ArrayList<Double> oneLevelAddition = addVectors(nodeVector.get(vertexIds.get(edgeSource)), edgeVector);
+            distances.add(calculateDistance(oneLevelAddition, nodeVector.get(vertexIds.get(edgeTarget))));
+        }
+
+    }
+
+    private static Double calculateDistance(ArrayList<Double> transEVector, ArrayList<Double> targetVector) {
+        double distance = 0;
+        for(int vectorIndex=0; vectorIndex< targetVector.size(); vectorIndex++){
+            targetVector.get(vectorIndex) - transEVector.get(vectorIndex)
+        }
+        return null;
+    }
+
+    private static ArrayList<Double> addVectors(ArrayList<Double> doubles, ArrayList<Double> edgeVector) {
+        return null;
     }
 
     private static void initialDatasetEvaluation() {
@@ -87,30 +125,33 @@ public class EvaluateDataCentricRecommendation {
     private static void prepareTransEInputs() {
         int countFile = 0;
         Map<String, Integer> paperIds = new HashMap<String, Integer>();
-        for(int timeIndex=0; timeIndex<NUMBER_OF_UNIQUE_DATES-1; timeIndex++) {
-            if (canBePredicted[timeIndex + 1] != 0) {
+        for(int timeIndex=NUMBER_OF_UNIQUE_DATES-1; timeIndex<NUMBER_OF_UNIQUE_DATES-1; timeIndex++) {
+//            if (canBePredicted[timeIndex + 1] != 0) {
                 countFile++;
                 String train = "";
-                Graph<String, DefaultWeightedEdge> completeGraphWithReverseEdges = addReverseEdgesToWeightedGraph(completeGraph[timeIndex]);
-                for(DefaultWeightedEdge edge: completeGraphWithReverseEdges.edgeSet()){
-                    String edgeSource = completeGraphWithReverseEdges.getEdgeSource(edge);
-                    String edgeTarget = completeGraphWithReverseEdges.getEdgeTarget(edge);
+//                Graph<String, DefaultWeightedEdge> completeGraphWithReverseEdges = addReverseEdgesToWeightedGraph(completeGraph[timeIndex]);
+            Graph<String, DefaultEdge> graph = incompleteSimpleGraph[timeIndex];
+
+            for(DefaultEdge edge: graph.edgeSet()){
+                    String edgeSource = graph.getEdgeSource(edge);
+                    String edgeTarget = graph.getEdgeTarget(edge);
                     train +=(edgeSource +" "+ edgeTarget +" FB \n");
                 }
                 int nodeId = 0;
                 String entity2id = "";
-                for(String node:completeSimpleGraph[timeIndex].vertexSet()){
+                for(String node:graph.vertexSet()){
                     entity2id += (node + " "+nodeId + "\n");
+                    vertexIds.put(node, nodeId);
                     nodeId++;
                 }
-                String trainFileName = "train" + countFile + ".txt";
+                String trainFileName = "train.txt";
                 print("Writing in file: "+ trainFileName);
                 Printer.writeToFile(train, trainFileName);
-                String entityFileName = "entity2id" + countFile + ".txt";
+                String entityFileName = "entity2id.txt";
                 print("Writing in file: "+ entityFileName);
                 Printer.writeToFile(entity2id, entityFileName);
             }
-        }
+//        }
     }
 
     private static void calculatePrecisions(double intentWeigth, double contextWeight, double pathLengthWeight) {
