@@ -360,4 +360,23 @@ public class Printer {
 
         writeToFile(fileName, workbook);
     }
+
+    public static void writeToFile(ArrayList<Double> distances, String transEDistancesResults, ArrayList<Integer> ranks) {
+        print("Started writing in excel file");
+
+        Workbook workbook = new XSSFWorkbook(); // new HSSFWorkbook() for generating `.xls` file
+        Sheet sheet = workbook.createSheet("Results");
+
+        Row headerRow = sheet.createRow(0);
+        headerRow.createCell(0).setCellValue("Distance");
+        headerRow.createCell(1).setCellValue("Ranks");
+
+        for (int index = 0; index < distances.size(); index++) {
+            Row results = sheet.createRow(index + 1);
+            results.createCell(0).setCellValue(distances.get(index));
+            results.createCell(1).setCellValue(ranks.get(index));
+        }
+
+        writeToFile(transEDistancesResults, workbook);
+    }
 }

@@ -1,11 +1,13 @@
 package Evaluation;
 
+import DataCentricRecommendation.CandidateScore;
 import DataCentricRecommendation.DataCentricRecommendation;
 import org.apache.commons.math3.util.Pair;
 import org.jgrapht.Graph;
 import org.jgrapht.GraphPath;
 import org.jgrapht.alg.shortestpath.DijkstraShortestPath;
 import org.jgrapht.graph.*;
+import scala.tools.cmd.gen.AnyVals;
 import serviceWorkflowNetwork.*;
 import utilities.Printer;
 
@@ -13,6 +15,7 @@ import java.io.*;
 import java.util.*;
 
 import static utilities.Printer.print;
+import static utilities.Printer.writeToFile;
 
 public class EvaluateDataCentricRecommendation {
     public static final int NUMBER_OF_UNIQUE_DATES = 716;
@@ -36,10 +39,10 @@ public class EvaluateDataCentricRecommendation {
     public static ArrayList<Pair<String, String>>[] potentialOnes;
 
     public static Map<String, Integer> vertexIds = new HashMap<String, Integer>();
-    private static ArrayList<ArrayList<Double>> nodeVector;
+    private static ArrayList<ArrayList<Double>> nodeVector = new ArrayList<ArrayList<Double>>();
     private static ArrayList<Double> edgeVector;
 
-    public static void main(String... args) {
+    public static void main(String... args) throws IOException {
         try {
             init();
         } catch (IOException e) {
@@ -49,7 +52,7 @@ public class EvaluateDataCentricRecommendation {
         }
 
 //        findRecalls();
-        prepareTransEInputs();
+//        prepareTransEInputs();
 
         readTransEResutls();
 //
@@ -64,7 +67,37 @@ public class EvaluateDataCentricRecommendation {
 //        initialDatasetEvaluation();
     }
 
-    private static void readTransEResutls() {
+    private static void readTransEResutls() throws IOException {
+        int nodeId = 0;
+        Graph<String, DefaultEdge> graph = incompleteSimpleGraph[NUMBER_OF_UNIQUE_DATES-1];
+        for (String node : graph.vertexSet()) {
+            vertexIds.put(node, nodeId);
+            nodeId++;
+        }
+
+        File file = new File("entity2vec.bern");
+        FileReader fileReader = new FileReader(file);
+        BufferedReader bufferedReader = new BufferedReader(fileReader);
+        String line;
+        while ((line = bufferedReader.readLine()) != null) {
+            nodeVector.add(new ArrayList<Double>());
+            String[] doubleValues = line.split("\t");
+            for(String str: doubleValues){
+                nodeVector.get(nodeVector.size()-1).add(Double.parseDouble(str));
+            }
+        }
+
+        File file2 = new File("relation2vec.bern");
+        FileReader fileReader2 = new FileReader(file2);
+        BufferedReader bufferedReader2 = new BufferedReader(fileReader2);
+        String line2;
+        edgeVector = new ArrayList<Double>();
+        while ((line2 = bufferedReader2.readLine()) != null) {
+            String[] doubleValues = line2.split("\t");
+            for(String str: doubleValues){
+                edgeVector.add(Double.parseDouble(str));
+            }
+        }
 
     }
 
@@ -72,26 +105,57 @@ public class EvaluateDataCentricRecommendation {
 
         Graph<String, DefaultEdge> testGraph = incompleteSimpleGraph[NUMBER_OF_UNIQUE_DATES - 1];
         ArrayList<Double> distances = new ArrayList<Double>();
+        ArrayList<Integer> ranks = new ArrayList<Integer>();
 
-        for(DefaultEdge edge: testGraph.edgeSet()){
+        for (DefaultEdge edge : testGraph.edgeSet()) {
             String edgeSource = testGraph.getEdgeSource(edge);
             String edgeTarget = testGraph.getEdgeTarget(edge);
             ArrayList<Double> oneLevelAddition = addVectors(nodeVector.get(vertexIds.get(edgeSource)), edgeVector);
+            ranks.add(recommend(oneLevelAddition, edgeSource, edgeTarget));
             distances.add(calculateDistance(oneLevelAddition, nodeVector.get(vertexIds.get(edgeTarget))));
         }
 
+        Printer.writeToFile(distances, "transEDistancesRanksResults400.xlsx", ranks);
+
+    }
+
+    private static Integer recommend(ArrayList<Double> oneLevelAddition, String edgeSource, String edgeTarget) {
+        Set<CandidateScore> candidateScores = new HashSet<CandidateScore>();
+        for(SService service: servicesInDate[NUMBER_OF_UNIQUE_DATES-1]){
+            if(!service.getURL().equals(edgeSource)){
+                Pair<String, String> pair = new Pair<String, String>(edgeSource, service.getURL());
+                Double score = calculateDistance(oneLevelAddition, nodeVector.get(vertexIds.get(service.getURL())));
+                CandidateScore candidateScore = new CandidateScore(pair, score);
+                candidateScores.add(candidateScore);
+            }
+        }
+        ArrayList<CandidateScore> candidateScoreArrayList = new ArrayList<CandidateScore>(candidateScores);
+        Collections.sort(candidateScoreArrayList);
+
+        int rank = 0;
+        for(int i=0; i<candidateScoreArrayList.size(); i++){
+            if(candidateScoreArrayList.get(i).getCandidate().getFirst().equals(edgeSource) && candidateScoreArrayList.get(i).getCandidate().getSecond().equals(edgeTarget)){
+                return (i+1);
+            }
+        }
+        return candidateScoreArrayList.size()+1;
     }
 
     private static Double calculateDistance(ArrayList<Double> transEVector, ArrayList<Double> targetVector) {
         double distance = 0;
-        for(int vectorIndex=0; vectorIndex< targetVector.size(); vectorIndex++){
-            targetVector.get(vectorIndex) - transEVector.get(vectorIndex)
+        for (int vectorIndex = 0; vectorIndex < targetVector.size(); vectorIndex++) {
+            double dist = targetVector.get(vectorIndex) - transEVector.get(vectorIndex);
+            distance += (dist * dist);
         }
-        return null;
+        return Math.sqrt(distance);
     }
 
-    private static ArrayList<Double> addVectors(ArrayList<Double> doubles, ArrayList<Double> edgeVector) {
-        return null;
+    private static ArrayList<Double> addVectors(ArrayList<Double> nodeVector, ArrayList<Double> edgeVector) {
+        ArrayList<Double> addition = new ArrayList<Double>();
+        for (int vectorIndex = 0; vectorIndex < nodeVector.size(); vectorIndex++) {
+            addition.add(nodeVector.get(vectorIndex) + edgeVector.get(vectorIndex));
+        }
+        return addition;
     }
 
     private static void initialDatasetEvaluation() {
@@ -123,35 +187,31 @@ public class EvaluateDataCentricRecommendation {
     }
 
     private static void prepareTransEInputs() {
+        print("I am in preparing TransE inputs");
         int countFile = 0;
         Map<String, Integer> paperIds = new HashMap<String, Integer>();
-        for(int timeIndex=NUMBER_OF_UNIQUE_DATES-1; timeIndex<NUMBER_OF_UNIQUE_DATES-1; timeIndex++) {
-//            if (canBePredicted[timeIndex + 1] != 0) {
-                countFile++;
-                String train = "";
-//                Graph<String, DefaultWeightedEdge> completeGraphWithReverseEdges = addReverseEdgesToWeightedGraph(completeGraph[timeIndex]);
-            Graph<String, DefaultEdge> graph = incompleteSimpleGraph[timeIndex];
-
-            for(DefaultEdge edge: graph.edgeSet()){
-                    String edgeSource = graph.getEdgeSource(edge);
-                    String edgeTarget = graph.getEdgeTarget(edge);
-                    train +=(edgeSource +" "+ edgeTarget +" FB \n");
-                }
-                int nodeId = 0;
-                String entity2id = "";
-                for(String node:graph.vertexSet()){
-                    entity2id += (node + " "+nodeId + "\n");
-                    vertexIds.put(node, nodeId);
-                    nodeId++;
-                }
-                String trainFileName = "train.txt";
-                print("Writing in file: "+ trainFileName);
-                Printer.writeToFile(train, trainFileName);
-                String entityFileName = "entity2id.txt";
-                print("Writing in file: "+ entityFileName);
-                Printer.writeToFile(entity2id, entityFileName);
-            }
-//        }
+        int timeIndex = NUMBER_OF_UNIQUE_DATES - 1;
+        countFile++;
+        String train = "";
+        Graph<String, DefaultEdge> graph = incompleteSimpleGraph[timeIndex];
+        for (DefaultEdge edge : graph.edgeSet()) {
+            String edgeSource = graph.getEdgeSource(edge);
+            String edgeTarget = graph.getEdgeTarget(edge);
+            train += (edgeSource + " " + edgeTarget + " FB \n");
+        }
+        int nodeId = 0;
+        String entity2id = "";
+        for (String node : graph.vertexSet()) {
+            entity2id += (node + " " + nodeId + "\n");
+            vertexIds.put(node, nodeId);
+            nodeId++;
+        }
+        String trainFileName = "train.txt";
+        print("Writing in file: " + trainFileName);
+        Printer.writeToFile(train, trainFileName);
+        String entityFileName = "entity2id.txt";
+        print("Writing in file: " + entityFileName);
+        Printer.writeToFile(entity2id, entityFileName);
     }
 
     private static void calculatePrecisions(double intentWeigth, double contextWeight, double pathLengthWeight) {
@@ -169,22 +229,22 @@ public class EvaluateDataCentricRecommendation {
         ArrayList<Double> minScores = new ArrayList<Double>();
         ArrayList<String> candidatesScores = new ArrayList<String>();
 
-        for(int timeIndex=0; timeIndex<NUMBER_OF_UNIQUE_DATES-1; timeIndex++){
-            if(canBePredicted[timeIndex+1]!=0) {
-                importantDates.add(uniqueSortedDates.get(timeIndex+1));
-                allNewOnes.add(newEdgesSources[timeIndex+1].size());
-                potentialEdges.add(canBePredicted[timeIndex+1]);
+        for (int timeIndex = 0; timeIndex < NUMBER_OF_UNIQUE_DATES - 1; timeIndex++) {
+            if (canBePredicted[timeIndex + 1] != 0) {
+                importantDates.add(uniqueSortedDates.get(timeIndex + 1));
+                allNewOnes.add(newEdgesSources[timeIndex + 1].size());
+                potentialEdges.add(canBePredicted[timeIndex + 1]);
 
                 print("Evaluating time = " + (timeIndex + 1));
                 Map<String, SService> serviceMap = createServiceMap(servicesWithLocalsInDate[timeIndex], timeIndex);
                 Graph<String, DefaultWeightedEdge> completeGraphWithReverseEdges = addReverseEdgesToWeightedGraph(completeGraph[timeIndex]);
                 DataCentricRecommendation recommendation = new DataCentricRecommendation(completeGraphWithReverseEdges, workflowsInDate[timeIndex], servicesInDate[timeIndex], serviceMap, incompleteSimpleGraph[timeIndex], intentWeigth, contextWeight, pathLengthWeight);
                 long beforeTime = System.currentTimeMillis();
-                int recommededCandidates = recommendation.recommend(newEdgesSources[timeIndex+1]);
+                int recommededCandidates = recommendation.recommend(newEdgesSources[timeIndex + 1]);
                 long endTime = System.currentTimeMillis();
                 candidateListSize.add(recommededCandidates);
-                ranksInCandidateList.add(recommendation.getRanks(potentialOnes[timeIndex+1]));
-                candidatesScores.add(recommendation.getScores(potentialOnes[timeIndex+1]));
+                ranksInCandidateList.add(recommendation.getRanks(potentialOnes[timeIndex + 1]));
+                candidatesScores.add(recommendation.getScores(potentialOnes[timeIndex + 1]));
                 minScores.add(recommendation.getMinScore());
                 maxScores.add(recommendation.getMaxScore());
                 time.add(endTime - beforeTime);
@@ -212,7 +272,7 @@ public class EvaluateDataCentricRecommendation {
         String fileIndex = "-" + intentWeigth + "-" + contextWeight + "-" + pathLengthWeight;
 
 //        Printer.saveToExcel(importantDates, time, "Times"+fileIndex+".xlsx");
-        Printer.saveToExcel(importantDates, allNewOnes, potentialEdges, candidateListSize, ranksInCandidateList, candidatesScores, minScores, maxScores, time, "All-Results"+fileIndex+".xlsx");
+        Printer.saveToExcel(importantDates, allNewOnes, potentialEdges, candidateListSize, ranksInCandidateList, candidatesScores, minScores, maxScores, time, "All-Results" + fileIndex + ".xlsx");
     }
 
     private static void findRecalls() {
@@ -225,42 +285,43 @@ public class EvaluateDataCentricRecommendation {
         newEdgesSources[0] = new ArrayList<Pair<String, String>>();
         canBePredicted = new int[NUMBER_OF_UNIQUE_DATES];
 
-        for(int timeIndex=0; timeIndex< NUMBER_OF_UNIQUE_DATES-1; timeIndex++){
-            print("Evaluating time = "+ (timeIndex+1));
+        for (int timeIndex = 0; timeIndex < NUMBER_OF_UNIQUE_DATES - 1; timeIndex++) {
+            print("Evaluating time = " + (timeIndex + 1));
             Graph<String, DefaultEdge> testGraph = incompleteSimpleGraph[timeIndex + 1];
             int countNewEdges = 0;
-            newEdgesSources[timeIndex+1] = new ArrayList<Pair<String, String>>();
-            potentialOnes[timeIndex+1] = new ArrayList<Pair<String, String>>();
+            newEdgesSources[timeIndex + 1] = new ArrayList<Pair<String, String>>();
+            potentialOnes[timeIndex + 1] = new ArrayList<Pair<String, String>>();
             int couldBePredicted = 0;
             Map<String, SService> serviceMap = createServiceMap(servicesInDate[timeIndex], timeIndex);
             Graph<String, DefaultEdge> completeGraphWithReverseEdges = addReverseEdgesToGraph(completeSimpleGraph[timeIndex]);
-            for(DefaultEdge edge: testGraph.edgeSet()){
+            for (DefaultEdge edge : testGraph.edgeSet()) {
                 String source = testGraph.getEdgeSource(edge);
                 String target = testGraph.getEdgeTarget(edge);
-                if(serviceMap.containsKey(source) && serviceMap.containsKey(target) && !incompleteSimpleGraph[timeIndex].containsEdge(source, target)){
+                if (serviceMap.containsKey(source) && serviceMap.containsKey(target) && !incompleteSimpleGraph[timeIndex].containsEdge(source, target)) {
                     countNewEdges++;
-                    newEdgesSources[timeIndex+1].add(new Pair<String, String>(source, target));
-                    if(completeGraphWithReverseEdges.containsVertex(source) && completeGraphWithReverseEdges.containsVertex(target)) {
+                    newEdgesSources[timeIndex + 1].add(new Pair<String, String>(source, target));
+                    if (completeGraphWithReverseEdges.containsVertex(source) && completeGraphWithReverseEdges.containsVertex(target)) {
                         DijkstraShortestPath<String, DefaultEdge> dijkstraAlg = new DijkstraShortestPath<String, DefaultEdge>(completeGraphWithReverseEdges);
                         GraphPath<String, DefaultEdge> path = dijkstraAlg.getPaths(source).getPath(target);
                         if (path != null) {
                             couldBePredicted++;
-                            potentialOnes[timeIndex+1].add(new Pair<String, String>(source, target));
+                            potentialOnes[timeIndex + 1].add(new Pair<String, String>(source, target));
                         }
                     }
                 }
             }
-            newEdges[timeIndex+1] = countNewEdges;
-            canBePredicted[timeIndex+1] = couldBePredicted;
+            newEdges[timeIndex + 1] = countNewEdges;
+            canBePredicted[timeIndex + 1] = couldBePredicted;
         }
 
         //It should be noted that the time index that we get the results for are actually timeIndex+1
         double[] recalls = new double[NUMBER_OF_UNIQUE_DATES];
-        for(int timeIndex=1; timeIndex<NUMBER_OF_UNIQUE_DATES; timeIndex++){
-            if(newEdges[timeIndex]!=0){
-                recalls[timeIndex] = (double) canBePredicted[timeIndex]/newEdges[timeIndex];
-            }else{
-                recalls[timeIndex] = 0.;;
+        for (int timeIndex = 1; timeIndex < NUMBER_OF_UNIQUE_DATES; timeIndex++) {
+            if (newEdges[timeIndex] != 0) {
+                recalls[timeIndex] = (double) canBePredicted[timeIndex] / newEdges[timeIndex];
+            } else {
+                recalls[timeIndex] = 0.;
+                ;
             }
         }
 
@@ -304,12 +365,12 @@ public class EvaluateDataCentricRecommendation {
             double edgeWeight = graph.getEdgeWeight(weightedEdge);
 
             DefaultWeightedEdge defaultWeightedEdge = graphWithReverseEdges.addEdge(reverseEdge.getFirst(), reverseEdge.getSecond());
-            if(defaultWeightedEdge!=null) {
+            if (defaultWeightedEdge != null) {
                 graphWithReverseEdges.setEdgeWeight(defaultWeightedEdge, edgeWeight);
             }
 
             DefaultWeightedEdge defaultWeightedEdge1 = graphWithReverseEdges.addEdge(reverseEdge.getSecond(), reverseEdge.getFirst());
-            if(defaultWeightedEdge1!=null) {
+            if (defaultWeightedEdge1 != null) {
                 graphWithReverseEdges.setEdgeWeight(defaultWeightedEdge1, edgeWeight);
             }
         }
@@ -339,7 +400,7 @@ public class EvaluateDataCentricRecommendation {
         Map<String, SService> serviceMap = new HashMap<String, SService>();
         for (SService service : services) {
             serviceMap.put(service.getURL(), service);
-            if(service.getIntent()==null){
+            if (service.getIntent() == null) {
                 service.setIntent(findIntent(service, timeIndex));
             }
         }
@@ -438,7 +499,7 @@ public class EvaluateDataCentricRecommendation {
 ////        oos5.writeObject(workflowsInDate);
 ////        oos8.writeObject(operationsInDate);
 //        oos9.writeObject(operationsWithLocalsInDate);
-        print("services size: "+servicesInDate[715].size());
+        print("services size: " + servicesInDate[715].size());
 //
 //        oos6.writeObject(incompleteSimpleGraph);
 //        oos7.writeObject(completeSimpleGraph);
@@ -455,8 +516,8 @@ public class EvaluateDataCentricRecommendation {
     }
 
     private static void accumulateGraphs() {
-        for(int i=0; i<NUMBER_OF_UNIQUE_DATES; i++){
-            for(int j=i+1; j<NUMBER_OF_UNIQUE_DATES; j++){
+        for (int i = 0; i < NUMBER_OF_UNIQUE_DATES; i++) {
+            for (int j = i + 1; j < NUMBER_OF_UNIQUE_DATES; j++) {
                 updateGraph(incompleteSimpleGraph[i], incompleteSimpleGraph[j]);
                 updateGraph(completeSimpleGraph[i], completeSimpleGraph[j]);
                 updateWeightedGraph(inclompleteGraph[i], inclompleteGraph[j]);
@@ -466,19 +527,19 @@ public class EvaluateDataCentricRecommendation {
     }
 
     private static void updateGraph(Graph<String, DefaultEdge> stringDefaultEdgeGraph, Graph<String, DefaultEdge> stringDefaultEdgeGraph1) {
-        for(String vertex: stringDefaultEdgeGraph.vertexSet()){
+        for (String vertex : stringDefaultEdgeGraph.vertexSet()) {
             stringDefaultEdgeGraph1.addVertex(vertex);
         }
-        for(DefaultEdge edge: stringDefaultEdgeGraph.edgeSet()){
+        for (DefaultEdge edge : stringDefaultEdgeGraph.edgeSet()) {
             stringDefaultEdgeGraph1.addEdge(stringDefaultEdgeGraph.getEdgeSource(edge), stringDefaultEdgeGraph.getEdgeTarget(edge));
         }
     }
 
     private static void updateWeightedGraph(Graph<String, DefaultWeightedEdge> stringDefaultEdgeGraph, Graph<String, DefaultWeightedEdge> stringDefaultEdgeGraph1) {
-        for(String vertex: stringDefaultEdgeGraph.vertexSet()){
+        for (String vertex : stringDefaultEdgeGraph.vertexSet()) {
             stringDefaultEdgeGraph1.addVertex(vertex);
         }
-        for(DefaultWeightedEdge edge: stringDefaultEdgeGraph.edgeSet()){
+        for (DefaultWeightedEdge edge : stringDefaultEdgeGraph.edgeSet()) {
             stringDefaultEdgeGraph1.addEdge(stringDefaultEdgeGraph.getEdgeSource(edge), stringDefaultEdgeGraph.getEdgeTarget(edge));
         }
     }
